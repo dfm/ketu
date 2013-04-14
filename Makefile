@@ -1,5 +1,12 @@
 CC ?= gcc
-CLIB = -framework OpenCL
+CFLAGS = -Iinclude
+CLIB = -framework OpenCL -lcfitsio
 
-reduce: src/reduce.c
-	${CC} ${CFLAGS} src/reduce.c -o bin/reduce ${CLIB}
+# reduce: src/reduce.c
+# 	${CC} ${CFLAGS} src/reduce.c -o bin/reduce ${CLIB}
+
+.c.o:
+	$(CC) $(CFLAGS) -o $*.o -c $*.c
+
+turnstile: src/turnstile.c src/kepler.o
+	${CC} ${CFLAGS} src/turnstile.c src/kepler.o -o bin/turnstile ${CLIB}
