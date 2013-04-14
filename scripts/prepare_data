@@ -1,0 +1,34 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import (division, print_function, absolute_import,
+                        unicode_literals)
+
+import os
+import sys
+import pyfits
+import untrendy
+
+if __name__ == "__main__":
+    if not len(sys.argv) > 1:
+        print("Please give at least one filename.")
+        sys.exit(1)
+
+    for fn in sys.argv[1:]:
+        with pyfits.open(fn) as f:
+            data = f[1].data
+            time, flux, ferr = (data["TIME"],
+                                data["SAP_FLUX"],
+                                data["SAP_FLUX_ERR"])
+
+        flux, ferr = untrendy.detrend(time, flux, ferr,
+                                      fill_times=10 ** -1.25)
+
+        hdu = pyfits.new_table(pyfits.ColDefs([
+            pyfits.Column(name="TIME", format="E", array=time),
+            pyfits.Column(name="FLUX", format="E", array=flux),
+            pyfits.Column(name="FERR", format="E", array=ferr)]))
+
+        base, ext = os.path.splitext(fn)
+        new_fn = base + "-untrend" + ext
+        hdu.writeto(new_fn)

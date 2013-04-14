@@ -66,9 +66,9 @@ dataset *read_kepler_lc (const char *filename)
     for (i = 0; i < ncols; ++i) {
         if (strcmp(labels[i], "TIME") == 0)
             time_col = i;
-        else if (strcmp(labels[i], "SAP_FLUX") == 0)
+        else if (strcmp(labels[i], "FLUX") == 0)
             flux_col = i;
-        else if (strcmp(labels[i], "SAP_FLUX_ERR") == 0)
+        else if (strcmp(labels[i], "FERR") == 0)
             ferr_col = i;
     }
 
