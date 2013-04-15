@@ -6,10 +6,10 @@ dataset *init_dataset(int length)
 {
     dataset *self = (dataset*)malloc(length * sizeof(dataset));
     self->length = length;
-    self->time = (float*)malloc(length * sizeof(float));
-    self->flux = (float*)malloc(length * sizeof(float));
-    self->ferr = (float*)malloc(length * sizeof(float));
-    self->ivar = (float*)malloc(length * sizeof(float));
+    self->time = malloc(length * sizeof(float));
+    self->flux = malloc(length * sizeof(float));
+    self->ferr = malloc(length * sizeof(float));
+    self->ivar = malloc(length * sizeof(float));
     return self;
 }
 
@@ -20,6 +20,40 @@ void free_dataset(dataset *self)
     free(self->ferr);
     free(self->ivar);
     free(self);
+}
+
+int mask_dataset(dataset *self)
+{
+    int i, count = 0, N = self->length;
+    float *tscratch = malloc(N * sizeof(float)),
+          *fscratch = malloc(N * sizeof(float)),
+          *escratch = malloc(N * sizeof(float));
+
+    // Figure out which values are unmasked.
+    for (i = 0; i < N; ++i) {
+        if (self->flux[i] > 0.0 && self->ferr[i] > 0.0) {
+            tscratch[count] = self->time[i];
+            fscratch[count] = self->flux[i];
+            escratch[count] = self->ferr[i];
+            count += 1;
+        }
+    }
+
+    // Update the dataset.
+    free_dataset(self);
+    self = init_dataset(count);
+    for (i = 0; i < count; ++i) {
+        self->time[i] = tscratch[i];
+        self->flux[i] = fscratch[i];
+        self->ferr[i] = escratch[i];
+    }
+
+    // Clean up the scratch memory.
+    free(tscratch);
+    free(fscratch);
+    free(escratch);
+
+    return count;
 }
 
 void print_fits_error(int status)

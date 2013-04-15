@@ -5,30 +5,51 @@ from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
 import os
-import sys
+import numpy as np
 import pyfits
+import kplr
 import untrendy
 
 if __name__ == "__main__":
-    if not len(sys.argv) > 1:
-        print("Please give at least one filename.")
-        sys.exit(1)
+    client = kplr.mast.API()
+    planet = client.kois(max_records=1, kepoi="72.01").next()
+    # planet = client.kois(max_records=1, kepoi="17.01").next()
+    print(planet)
+    period = planet.koi_period
+    print(period)
+    datasets = [d.fetch() for d in client.data(planet.kepid)]
 
-    for fn in sys.argv[1:]:
-        with pyfits.open(fn) as f:
-            data = f[1].data
-            time, flux, ferr = (data["TIME"],
-                                data["SAP_FLUX"],
-                                data["SAP_FLUX_ERR"])
+    time_final = np.array([])
+    flux_final = np.array([])
+    ferr_final = np.array([])
 
-        flux, ferr = untrendy.detrend(time, flux, ferr,
-                                      fill_times=10 ** -1.25)
+    for i, d in enumerate(datasets):
+        filename = d.filename
+        if "llc" in filename:
+            with pyfits.open(filename) as f:
+                data = f[1].data
+                time, flux, ferr = (data["TIME"],
+                                    data["SAP_FLUX"],
+                                    data["SAP_FLUX_ERR"])
 
-        hdu = pyfits.new_table(pyfits.ColDefs([
-            pyfits.Column(name="TIME", format="E", array=time),
-            pyfits.Column(name="FLUX", format="E", array=flux),
-            pyfits.Column(name="FERR", format="E", array=ferr)]))
+            flux, ferr = untrendy.detrend(time, flux, ferr,
+                                          fill_times=10 ** -1.25)
 
-        base, ext = os.path.splitext(fn)
-        new_fn = base + "-untrend" + ext
-        hdu.writeto(new_fn)
+            time_final = np.append(time_final, time)
+            flux_final = np.append(flux_final, flux / np.median(flux))
+            ferr_final = np.append(ferr_final, ferr / np.median(flux))
+
+    hdu = pyfits.new_table(pyfits.ColDefs([
+        pyfits.Column(name="TIME", format="E", array=time_final),
+        pyfits.Column(name="FLUX", format="E", array=flux_final),
+        pyfits.Column(name="FERR", format="E", array=ferr_final)]))
+
+    base, ext = os.path.splitext(filename)
+    new_fn = "data.fits"
+    hdu.writeto(new_fn, clobber=True)
+
+    import matplotlib.pyplot as pl
+    pl.plot(time_final % period, flux_final, ".k", alpha=0.3)
+    # pl.plot(time_final, flux_final, ".k", alpha=0.3)
+    pl.ylim(0.9993, 1.0003)
+    pl.savefig("data.png")
