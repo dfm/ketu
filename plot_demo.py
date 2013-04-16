@@ -8,6 +8,6 @@ import numpy as np
 import matplotlib.pyplot as pl
 
 
-data = np.loadtxt("lc.txt")
-pl.plot(data[:, 0] % 4.0, data[:, 1], ".k")
-pl.savefig("demo.png")
+data = np.loadtxt("out.txt", skiprows=3)
+pl.plot(data[:, 0], data[:, 1], ".k")
+pl.savefig("trying.png")

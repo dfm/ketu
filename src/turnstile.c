@@ -91,7 +91,7 @@ static char* load_kernel_source(const char *filename)
 
 int fit_gpu (dataset *data)
 {
-    int i, N = data->length;
+    int i, j, N = data->length;
     float *time = data->time, *flux = data->flux, *ivar = data->ivar;
 
     // Compute min and max times.
@@ -105,11 +105,6 @@ int fit_gpu (dataset *data)
 
     // Fix the duration for speed.
     float duration = 0.1;
-
-    // Make the grid of periods.
-    float min_period = 0.8, max_period = 0.9, dperiod = 1 + duration * delta;
-    int nperiods = (int)((max_period - min_period) / dperiod);
-    float *periods = malloc(nperiods * sizeof(float));
 
     // Set up the GPU.
     int err;
@@ -130,8 +125,19 @@ int fit_gpu (dataset *data)
     }
     fprintf(stdout, "Maximum work group size: %d\n", (int)wg_size);
 
+    // Set up the grid.
+    int nperiods = 1024, nepochs = 256;
+    float min_period = 0.4, max_period = 100.0, dperiod,
+          *periods = malloc(nperiods * sizeof(float));
+
+    dperiod = (log(max_period) - log(min_period)) / nperiods;
+    for (i = 0; i < nperiods; ++i) {
+        periods[i] = exp(log(min_period) + i * dperiod);
+    }
+
+
     // Load the kernel source.
-    const char *filename = "kernels/reduce_test.cl",
+    const char *filename = "kernels/turnstile.cl",
                *source = load_kernel_source(filename);
     if (!source) {
         fprintf(stderr, "Error: Failed to load source from file\n");
@@ -153,14 +159,14 @@ int fit_gpu (dataset *data)
     }
 
     // Allocate some memory on the device.
-    cl_mem time_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE,
+    cl_mem time_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY,
                                         N * sizeof(float), NULL, NULL),
-           flux_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE,
+           flux_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY,
                                         N * sizeof(float), NULL, NULL),
-           periods_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE,
+           periods_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY,
                                         nperiods * sizeof(float), NULL, NULL),
-           results_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE,
-                                        nperiods * sizeof(float), NULL, NULL);
+           results_buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY,
+                            nepochs * nperiods * sizeof(float), NULL, NULL);
     if (!time_buffer || !flux_buffer || !periods_buffer || !results_buffer) {
         fprintf(stderr, "Error: Failed to allocate buffers on device\n");
         return EXIT_FAILURE;
@@ -172,6 +178,8 @@ int fit_gpu (dataset *data)
                                 N * sizeof(float), time, 0, NULL, NULL);
     err |= clEnqueueWriteBuffer(queue, flux_buffer, CL_TRUE, 0,
                                 N * sizeof(float), flux, 0, NULL, NULL);
+    err |= clEnqueueWriteBuffer(queue, periods_buffer, CL_TRUE, 0,
+                            nperiods * sizeof(float), periods, 0, NULL, NULL);
     if (err != CL_SUCCESS) {
         fprintf(stderr, "Error: Failed to copy data\n");
         return EXIT_FAILURE;
@@ -200,13 +208,52 @@ int fit_gpu (dataset *data)
     }
 
     // Compile the kernel.
-    cl_kernel kernel = clCreateKernel(program, "fit_depths", &err);
+    cl_kernel kernel = clCreateKernel(program, "turnstile_kernel", &err);
     if (!kernel || err != CL_SUCCESS) {
         fprintf(stderr, "Error: Failed to compile kernel\n");
         return EXIT_FAILURE;
     }
 
+    // Set the arguments.
+    err = 0;
+    err  = clSetKernelArg(kernel, 0, sizeof(cl_mem), &time_buffer);
+    err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &flux_buffer);
+    err |= clSetKernelArg(kernel, 2, sizeof(unsigned int), &N);
+    err |= clSetKernelArg(kernel, 3, sizeof(cl_mem), &periods_buffer);
+    err |= clSetKernelArg(kernel, 4, sizeof(unsigned int), &nperiods);
+    err |= clSetKernelArg(kernel, 5, sizeof(unsigned int), &nepochs);
+    err |= clSetKernelArg(kernel, 6, sizeof(float), &duration);
+    err |= clSetKernelArg(kernel, 7, sizeof(cl_mem), &results_buffer);
+    if (err != CL_SUCCESS) {
+        fprintf(stderr, "Error: Failed to set arguments\n");
+        return EXIT_FAILURE;
+    }
 
+    // Run the kernel.
+    size_t global = nperiods * nepochs, local = nepochs;
+    printf("Global: %d Local: %d\n", (int)global, (int)local);
+    err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &global, &local, 0,
+                                 NULL, NULL);
+    if (err != CL_SUCCESS) {
+        fprintf(stderr, "Error: Failed to run kernel (%d)\n", err);
+        return EXIT_FAILURE;
+    }
+    clFinish(queue);
+
+    // Read the data back in.
+    float *depths = malloc(nepochs * nperiods * sizeof(float));
+    for (i = 0; i < nperiods; ++i)
+        depths[i] = (float)i;
+    err = clEnqueueReadBuffer(queue, results_buffer, CL_TRUE, 0,
+                              nperiods * nepochs * sizeof(float), depths, 0, NULL, NULL);
+    if (err != CL_SUCCESS) {
+        fprintf(stderr, "Error: Failed to read results (%d)\n", err);
+        return EXIT_FAILURE;
+    }
+
+    for (i = 0; i < nperiods; ++i)
+        for (j = 0; j < nepochs; ++j)
+            printf("%f %f\n", periods[i], depths[i * nepochs + j]);
 
     // Clean up.
     clReleaseKernel(kernel);
@@ -220,6 +267,7 @@ int fit_gpu (dataset *data)
     clReleaseContext(context);
 
     free(periods);
+    free(depths);
 
     return 0;
 }
@@ -229,10 +277,9 @@ int main()
     const char *filename = "data.fits";
 
     dataset *data = read_kepler_lc(filename);
-    printf("%d ", data->length);
     mask_dataset(data);
-    printf("%d\n", data->length);
-    int val = fit_dataset(data);
+    /* int val = fit_dataset(data); */
+    int val = fit_gpu(data);
     free_dataset(data);
 
     return val;
