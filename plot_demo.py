@@ -9,5 +9,7 @@ import matplotlib.pyplot as pl
 
 
 data = np.loadtxt("out.txt", skiprows=3)
-pl.plot(data[:, 0], data[:, 1], ".k")
+inds = data[:, 1] > 0
+pl.plot(data[inds, 0], data[inds, 1], ".k")
+# pl.xlim(0.2, 1.0)
 pl.savefig("trying.png")

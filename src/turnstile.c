@@ -126,8 +126,8 @@ int fit_gpu (dataset *data)
     fprintf(stdout, "Maximum work group size: %d\n", (int)wg_size);
 
     // Set up the grid.
-    int nperiods = 1024, nepochs = 256;
-    float min_period = 0.4, max_period = 100.0, dperiod,
+    int nperiods = 1024 * 8, nepochs = 32;
+    float min_period = 2 * duration, max_period = 50.0, dperiod,
           *periods = malloc(nperiods * sizeof(float));
 
     dperiod = (log(max_period) - log(min_period)) / nperiods;
@@ -251,9 +251,12 @@ int fit_gpu (dataset *data)
         return EXIT_FAILURE;
     }
 
-    for (i = 0; i < nperiods; ++i)
-        for (j = 0; j < nepochs; ++j)
-            printf("%f %f\n", periods[i], depths[i * nepochs + j]);
+    for (i = 0; i < nperiods; ++i) {
+        for (j = 0; j < nepochs; ++j) {
+            float d = depths[i * nepochs + j];
+            printf("%f %e\n", periods[i], d);
+        }
+    }
 
     // Clean up.
     clReleaseKernel(kernel);
@@ -275,11 +278,12 @@ int fit_gpu (dataset *data)
 int main()
 {
     const char *filename = "data.fits";
+    int val = 0;
 
     dataset *data = read_kepler_lc(filename);
     mask_dataset(data);
     /* int val = fit_dataset(data); */
-    int val = fit_gpu(data);
+    val = fit_gpu(data);
     free_dataset(data);
 
     return val;
