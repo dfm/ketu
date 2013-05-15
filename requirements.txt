@@ -1,0 +1,9 @@
+numpy
+scipy
+matplotlib
+
+-e git+https://github.com/dfm/kplr#egg=kplr-dev
+-e git+https://github.com/dfm/untrendy#egg=untrendy-dev
+
+pynsq
+requests

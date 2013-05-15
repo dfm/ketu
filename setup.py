@@ -3,45 +3,53 @@
 
 import os
 import sys
-from numpy.distutils.core import setup, Extension
 
+try:
+    from numpy.distutils.misc_util import get_numpy_include_dirs
+except ImportError:
+    get_numpy_include_dirs = lambda: []
+
+try:
+    from setuptools import setup, Extension
+except ImportError:
+    from distutils.core import setup, Extension
 
 if sys.argv[-1] == "publish":
-    os.system("git rev-parse --short HEAD > COMMIT")
     os.system("python setup.py sdist upload")
     sys.exit()
 
-
-# First, make sure that the f2py interfaces exist.
-interface_exists = os.path.exists("turnstile/bls.pyf")
-if "interface" in sys.argv or not interface_exists:
-    # Generate the Fortran signature/interface.
-    cmd = "cd src;"
-    cmd += "f2py eebls.f -m _bls -h ../turnstile/bls.pyf"
-    cmd += " --overwrite-signature"
-    os.system(cmd)
-    if "interface" in sys.argv:
-        sys.exit(0)
-
-# Define the Fortran extension.
-bls = Extension("turnstile._bls", ["turnstile/bls.pyf", "src/eebls.f"])
+turnstile = Extension("turnstile._turnstile", ["turnstile/_turnstile.c"],
+                      include_dirs=get_numpy_include_dirs())
 
 setup(
     name="turnstile",
-    url="https://github.com/dfm/turnstile",
+    url="https://github.com/dfm/untrendy",
     version="0.0.1",
     author="Dan Foreman-Mackey",
     author_email="danfm@nyu.edu",
-    description="",
-    long_description="",
-    packages=["turnstile", ],
-    ext_modules=[bls, ],
+    description="Style.",
+    long_description=open("README.rst").read(),
+    packages=["turnstile"],
+    # scripts=["bin/untrend"],
+    package_data={"": ["README.rst", "LICENSE.rst"], },
+    # "untrendy": ["untrendy.h", "test_data/*"]},
+    include_package_data=True,
+    ext_modules=[turnstile],
     classifiers=[
+        # "Development Status :: 2 - Pre-Alpha",
+        # "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         # "Development Status :: 5 - Production/Stable",
+        # "Development Status :: 6 - Mature",
         "Intended Audience :: Developers",
         "Intended Audience :: Science/Research",
+        "Topic :: Scientific/Engineering :: Astronomy",
+        "Topic :: Scientific/Engineering :: Physics",
+        "Topic :: Scientific/Engineering :: Mathematics",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Programming Language :: Python",
+        "Programming Language :: Python :: 2.7",
+        "Programming Language :: Python :: 3.3",
     ],
 )
