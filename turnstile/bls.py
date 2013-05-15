@@ -28,7 +28,7 @@ if __name__ == "__main__":
 
     inds = ~np.isnan(flux)
 
-    fmin, fmax = 1.0 / 50, 1.0 / 0.5
+    fmin, fmax = 1.0 / 100, 1.0 / 40
     nf = 10000
     df = (fmax - fmin) / nf
     p, bper, bpow, depth, qtran, in1, in2 = bls(time[inds], flux[inds], nf,
@@ -40,3 +40,8 @@ if __name__ == "__main__":
     print(f.shape, p.shape)
     pl.plot(1. / f, p)
     pl.savefig("bls.png")
+
+    pl.clf()
+    pl.plot(time % bper, flux, ".k", alpha=0.3)
+    pl.xlim(0, 6)
+    pl.savefig("lc.png")
