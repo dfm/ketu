@@ -11,13 +11,15 @@ import kplr
 from . import _turnstile
 
 
-def process(kepid):
+def process(kepid, lc_only=True):
     # Find the list of data files.
     client = kplr.API()
 
     # Load and untrend the data.
     time, flux, ivar = [], [], []
     for d in client.data(kepid):
+        if lc_only and "slc" in d.filename:
+            continue
         dataset = kplr.Dataset(d.filename, untrend=True)
         time.append(dataset.time[dataset.mask])
         flux.append(dataset.flux[dataset.mask])
