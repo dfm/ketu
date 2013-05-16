@@ -1,6 +1,7 @@
 CC ?= gcc
-CFLAGS = -Iinclude
-CLIB = -framework OpenCL -lcfitsio
+CFLAGS = -Iinclude -std=c99
+CLIB = -lcfitsio -lOpenCL
+# CLIB = -framework OpenCL -lcfitsio
 
 # reduce: src/reduce.c
 # 	${CC} ${CFLAGS} src/reduce.c -o bin/reduce ${CLIB}

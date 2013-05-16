@@ -110,6 +110,7 @@ int fit_gpu (dataset *data)
     int err;
     cl_device_id device_id;
     err = clGetDeviceIDs(NULL, CL_DEVICE_TYPE_GPU, 1, &device_id, NULL);
+    printf("sup\n");
     if (err != CL_SUCCESS) {
         fprintf(stderr, "Error: Failed to connect to GPU\n");
         return EXIT_FAILURE;
@@ -126,7 +127,7 @@ int fit_gpu (dataset *data)
     fprintf(stdout, "Maximum work group size: %d\n", (int)wg_size);
 
     // Set up the grid.
-    int nperiods = 1024, nepochs = 256;
+    int nperiods = 64, nepochs = 64;
     float min_period = 0.4, max_period = 100.0, dperiod,
           *periods = malloc(nperiods * sizeof(float));
 
@@ -275,11 +276,12 @@ int fit_gpu (dataset *data)
 int main()
 {
     const char *filename = "data.fits";
+    int val = 0;
 
     dataset *data = read_kepler_lc(filename);
     mask_dataset(data);
-    /* int val = fit_dataset(data); */
-    int val = fit_gpu(data);
+    /* val = fit_dataset(data); */
+    /* int val = fit_gpu(data); */
     free_dataset(data);
 
     return val;
