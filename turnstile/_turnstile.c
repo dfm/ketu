@@ -48,18 +48,53 @@ static PyObject
            *flux = (double*)PyArray_DATA(flux_array),
            *ivar = (double*)PyArray_DATA(ivar_array);
 
-    printf("%f\n", time[0]);
+    // Find the periods.
+    int nperiods = (int)((max_period - min_period) / dperiod) + 1;
+    npy_intp pdim[1] = {nperiods};
+
+    PyArrayObject *period_array = (PyArrayObject*)PyArray_SimpleNew(1, pdim, NPY_DOUBLE),
+                  *depth_array = (PyArrayObject*)PyArray_SimpleNew(1, pdim, NPY_DOUBLE);
+    double *periods = (double*)PyArray_DATA(period_array),
+           *depths = (double*)PyArray_DATA(period_array);
+
+    int i, k, nmin, nmax;
+    double htau = 0.5 * tau, epoch, period, fmin, fmax, tnorm,
+           depth, maxdepth = 0.0;
+    for (i = 0; i < nperiods; ++i) {
+        period = periods[i] = min_period + i * dperiod;
+        maxdepth = 0.0;
+        for (epoch = 0.0; epoch < period; epoch += htau) {
+            fmin = 0.0;
+            fmax = 0.0;
+            nmin = 0;
+            nmax = 0;
+            for (k = 0; k < n; ++k) {
+                tnorm = fmod(time[k] - epoch, period);
+                if (tnorm < tau) {
+                    fmin += flux[k];
+                    nmin++;
+                } else {
+                    fmax += flux[k];
+                    nmax++;
+                }
+            }
+            depth = fmax / (double)nmax - fmin / (double)nmin;
+            if (depth > maxdepth) maxdepth = depth;
+        }
+        printf("%f %f\n", period, maxdepth);
+        depths[i] = maxdepth;
+    }
 
     Py_DECREF(time_array);
     Py_DECREF(flux_array);
     Py_DECREF(ivar_array);
 
-    PyObject *ret = Py_BuildValue("i", 0);
+    PyObject *ret = Py_BuildValue("OO", period_array, depth_array);
     return ret;
 }
 
 static PyMethodDef turnstile_methods[] = {
-    {"find_discontinuities",
+    {"find_periods",
      (PyCFunction)turnstile_find_periods,
      METH_VARARGS,
      "Find periods in a time series."},
