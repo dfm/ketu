@@ -3,3 +3,6 @@
 bin/*
 data
 venv
+*.so
+turnstile/_bls*
+*.pyc

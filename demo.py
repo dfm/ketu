@@ -4,10 +4,9 @@
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
-import numpy as np
-import matplotlib.pyplot as pl
+from turnstile.turnstile import process
 
 
-data = np.loadtxt("out.txt", skiprows=3)
-pl.plot(data[:, 0], data[:, 1], ".k")
-pl.savefig("trying.png")
+if __name__ == "__main__":
+    # 213.622915
+    print(process("11761199"))
