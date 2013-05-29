@@ -1,5 +1,6 @@
 numpy
 scipy
+pyfits
 matplotlib
 
 -e git+https://github.com/dfm/kplr#egg=kplr-dev
