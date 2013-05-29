@@ -35,6 +35,9 @@ if __name__ == "__main__":
 
     periods, depths = _turnstile.find_periods(time, flux, ivar, 90, 200,
                                               0.1, 0.3)
+    # periods, depths = _turnstile.find_periods(time, flux, ivar,
+    #                                           period - 10, period + 10,
+    #                                           0.1, 0.3)
 
     pl.plot(periods, depths, "k")
     pl.gca().axvline(period, alpha=0.3)

@@ -70,33 +70,32 @@ lightcurve *lightcurve_fold_and_bin (lightcurve *lc, double period, double dt,
 
         for (i = 0; i < nbins; ++i)
             folded->flux[i] /= folded->ivar[i];
-    } else if (method == 1) { // Median.
-        int *bins = malloc(n * sizeof(int)),
-            *counts = malloc(nbins * sizeof(int));
 
-        for (i = 0; i < nbins; ++i) counts[i] = 0;
+    } else if (method == 1) { // Median.
+        int *counts = malloc(nbins * sizeof(int));
+        double **samples = malloc(nbins * sizeof(double*));
+
+        for (i = 0; i < nbins; ++i) {
+            counts[i] = 0;
+            samples[i] = malloc(n * sizeof(double));
+        }
 
         for (i = 0; i < n; ++i) {
-            bins[i] = (int)(fmod(lc->time[i], period) / dt);
-            if (bins[i] >= nbins) {
+            bin = (int)(fmod(lc->time[i], period) / dt);
+            if (bin >= nbins) {
                 fprintf(stderr, "Index failure (t=%f)\n", lc->time[i]);
-                bins[i] = nbins - 1;
+                bin = nbins - 1;
             }
-            counts[bins[i]]++;
-            folded->ivar[bins[i]] += lc->ivar[i];
+            samples[bin][counts[bin]++] = lc->flux[i];
+            folded->ivar[bin] += lc->ivar[i];
         }
 
         for (bin = 0; bin < nbins; ++bin) {
-            double *tmp = malloc(counts[bin] * sizeof(double));
-            j = 0;
-            for (i = 0; i < n; ++i)
-                if (bins[i] == bin)
-                    tmp[j++] = lc->flux[i];
-            folded->flux[bin] = quick_select(tmp, counts[bin]);
-            free(tmp);
+            folded->flux[bin] = quick_select(samples[bin], counts[bin]);
+            free(samples[bin]);
         }
 
-        free(bins);
+        free(samples);
         free(counts);
     }
 
