@@ -18,12 +18,13 @@ if sys.argv[-1] == "publish":
     os.system("python setup.py sdist upload")
     sys.exit()
 
-turnstile = Extension("turnstile._turnstile", ["turnstile/_turnstile.c"],
-                      include_dirs=get_numpy_include_dirs())
+turnstile = Extension("turnstile._turnstile", ["turnstile/_turnstile.c",
+                                               "turnstile/turnstile.c"],
+                      include_dirs=["turnstile"] + get_numpy_include_dirs())
 
 setup(
     name="turnstile",
-    url="https://github.com/dfm/untrendy",
+    url="https://github.com/dfm/turnstile",
     version="0.0.1",
     author="Dan Foreman-Mackey",
     author_email="danfm@nyu.edu",

@@ -9,6 +9,7 @@ __all__ = []
 import os
 import pyfits
 import numpy as np
+from . import _turnstile
 
 
 def load_dataset():
@@ -28,24 +29,18 @@ def test_fold_and_bin():
     import matplotlib.pyplot as pl
     time, flux, ferr = load_dataset()
     ivar = np.zeros_like(time)
-    inds = ferr > 0
+    inds = (ferr > 0) * (~np.isnan(flux))
     ivar = 1.0 / ferr[inds] ** 2
+    time = time[inds]
+    flux = flux[inds]
+    ferr = ferr[inds]
 
-    dt = 0.1
-    bins = np.arange(time.min(), time.max(), dt)
-    vals = np.zeros_like(bins)
-    ivar = np.zeros_like(bins)
-    for i, t in enumerate(bins):
-        mask = (time >= t) * (time < t + dt)
-        if np.sum(mask):
-            vals[i] = np.mean(flux[mask])
-            ivar[i] = 1.0 / np.mean(ferr[mask] ** 2)
+    print(ivar.shape, time.shape, flux.shape)
 
-    pl.errorbar(time, flux, yerr=ferr, fmt=".k")
+    period = 15
+    folded = _turnstile.find_periods(time, flux, ivar, period, 2.18, 0.1, 0.1)
 
-    inds = ivar > 0
-    print(np.sum(inds), len(time))
-    pl.errorbar(bins[inds], vals[inds], yerr=1.0 / np.sqrt(ivar[inds]),
-                fmt=".r")
+    pl.errorbar(time % period, flux, yerr=ferr, fmt=".k", alpha=0.3)
+    pl.errorbar(folded[0], folded[1], yerr=1.0 / np.sqrt(folded[2]), fmt=".r")
 
     pl.savefig("blah.png")
