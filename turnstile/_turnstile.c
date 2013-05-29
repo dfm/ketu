@@ -52,57 +52,30 @@ static PyObject
     data->flux = (double*)PyArray_DATA(flux_array);
     data->ivar = (double*)PyArray_DATA(ivar_array);
 
-    // Fold the lightcuve.
-    lightcurve *folded = lightcurve_fold_and_bin(data, min_period, tau);
-    npy_intp folded_dim[1] = {folded->length};
-    PyArrayObject *folded_time = (PyArrayObject*)PyArray_SimpleNewFromData(1, folded_dim, NPY_DOUBLE, folded->time),
-                  *folded_flux = (PyArrayObject*)PyArray_SimpleNewFromData(1, folded_dim, NPY_DOUBLE, folded->flux),
-                  *folded_ivar = (PyArrayObject*)PyArray_SimpleNewFromData(1, folded_dim, NPY_DOUBLE, folded->ivar);
-
     // Find the periods.
     int nperiods = (int)((max_period - min_period) / dperiod) + 1;
     npy_intp pdim[1] = {nperiods};
 
-//    PyArrayObject *period_array = (PyArrayObject*)PyArray_SimpleNew(1, pdim, NPY_DOUBLE),
-//                  *depth_array = (PyArrayObject*)PyArray_SimpleNew(1, pdim, NPY_DOUBLE);
-//    double *periods = (double*)PyArray_DATA(period_array),
-//           *depths = (double*)PyArray_DATA(period_array);
-//
-//    int i, k, nmin, nmax;
-//    double htau = 0.5 * tau, epoch, period, fmin, fmax, tnorm,
-//           depth, maxdepth = 0.0;
-//    for (i = 0; i < nperiods; ++i) {
-//        period = periods[i] = min_period + i * dperiod;
-//        maxdepth = 0.0;
-//        for (epoch = 0.0; epoch < period; epoch += htau) {
-//            fmin = 0.0;
-//            fmax = 0.0;
-//            nmin = 0;
-//            nmax = 0;
-//            for (k = 0; k < n; ++k) {
-//                tnorm = fmod(time[k] - epoch, period);
-//                if (tnorm < tau) {
-//                    fmin += flux[k];
-//                    nmin++;
-//                } else {
-//                    fmax += flux[k];
-//                    nmax++;
-//                }
-//            }
-//            depth = fmax / (double)nmax - fmin / (double)nmin;
-//            if (depth > maxdepth) maxdepth = depth;
-//        }
-//        printf("%f %f\n", period, maxdepth);
-//        depths[i] = maxdepth;
-//    }
+    PyArrayObject *period_array = (PyArrayObject*)PyArray_SimpleNew(1, pdim, NPY_DOUBLE),
+                  *depth_array = (PyArrayObject*)PyArray_SimpleNew(1, pdim, NPY_DOUBLE);
+    double *periods = (double*)PyArray_DATA(period_array),
+           *depths = (double*)PyArray_DATA(depth_array);
+
+    int i;
+    for (i = 0; i < nperiods; ++i) {
+        double period = periods[i] = min_period + i * dperiod;
+        lightcurve *folded = lightcurve_fold_and_bin(data, period, 0.5 * tau,
+                                                     1);
+        depths[i] = test_epoch(folded, 2);
+        free(folded);
+    }
 
     Py_DECREF(time_array);
     Py_DECREF(flux_array);
     Py_DECREF(ivar_array);
     free(data);
-    lightcurve_free(folded);
 
-    PyObject *ret = Py_BuildValue("OOO", folded_time, folded_flux, folded_ivar);
+    PyObject *ret = Py_BuildValue("OO", period_array, depth_array);
     return ret;
 }
 

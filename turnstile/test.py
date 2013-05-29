@@ -35,8 +35,6 @@ def test_fold_and_bin():
     flux = flux[inds]
     ferr = ferr[inds]
 
-    print(ivar.shape, time.shape, flux.shape)
-
     period = 15
     folded = _turnstile.find_periods(time, flux, ivar, period, 2.18, 0.1, 0.1)
 

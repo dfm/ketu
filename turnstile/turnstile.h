@@ -13,6 +13,8 @@ lightcurve *lightcurve_alloc (int length);
 void lightcurve_free (lightcurve *lc);
 void lightcurve_compute_extent (lightcurve *lc);
 
-lightcurve *lightcurve_fold_and_bin (lightcurve *lc, double period, double dt);
+lightcurve *lightcurve_fold_and_bin (lightcurve *lc, double period, double dt,
+                                     int method);
+double test_epoch(lightcurve *lc, int nbins);
 
 #endif
