@@ -30,6 +30,10 @@ def process(kepid, lc_only=True):
     flux = np.concatenate(flux)
     ivar = np.concatenate(ivar)
 
+    return fit_lc(time, flux, ivar)
+
+
+def fit_lc(time, flux, ivar):
     # Define the grid.
     min_period, max_period, dperiod = 213, 214, 0.2
     # min_period, max_period, dperiod = 180, 750, 0.2

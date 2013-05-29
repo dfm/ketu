@@ -6,3 +6,4 @@ venv
 *.so
 turnstile/_bls*
 *.pyc
+*.png
