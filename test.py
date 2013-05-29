@@ -35,11 +35,21 @@ if __name__ == "__main__":
     flux = np.concatenate(flux)
     ivar = np.concatenate(ivar)
 
+    inds = (time < 1185) + (time > 1188)
+    time = time[inds]
+    flux = flux[inds]
+    ivar = ivar[inds]
+
+    pl.plot(time, flux, ".k")
+    pl.savefig("sup.png")
+    # assert 0
+
     strt = timer.time()
-    periods, depths = _turnstile.find_periods(time, flux, ivar, 100, 600,
+    periods, depths = _turnstile.find_periods(time, flux, ivar, 100, 1.5 * 365,
                                               0.1, 0.3)
     print("Took {0} minutes.".format((timer.time() - strt) / 60.))
 
+    pl.clf()
     pl.plot(periods, depths, "k")
     pl.gca().axvline(122.3874, alpha=0.3)
     pl.gca().axvline(267.291, alpha=0.3)
