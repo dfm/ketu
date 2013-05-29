@@ -48,7 +48,7 @@ void lightcurve_compute_extent (lightcurve *lc)
 lightcurve *lightcurve_fold_and_bin (lightcurve *lc, double period, double dt,
                                      int method)
 {
-    int i, j, n = lc->length, bin;
+    int i, n = lc->length, bin;
 
     int nbins = (int)(period / dt) + 1;
     if (nbins == 0) nbins = 1;
@@ -105,7 +105,7 @@ lightcurve *lightcurve_fold_and_bin (lightcurve *lc, double period, double dt,
 double test_epoch(lightcurve *lc, int nbins)
 {
     int i, j, n, m;
-    double depth, w, max_depth = 0.0;
+    double depth, w, max_depth = -1.0;
     for (i = 0, n = lc->length; i < n; ++i) {
         depth = 0.0;
         w = 0.0;

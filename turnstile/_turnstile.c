@@ -64,6 +64,7 @@ static PyObject
     int i;
     for (i = 0; i < nperiods; ++i) {
         double period = periods[i] = min_period + i * dperiod;
+        tau = 0.5 * exp(0.44 * log(period) - 2.97);
         lightcurve *folded = lightcurve_fold_and_bin(data, period, 0.5 * tau,
                                                      1);
         depths[i] = test_epoch(folded, 2);
