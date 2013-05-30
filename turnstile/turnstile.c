@@ -102,22 +102,26 @@ lightcurve *lightcurve_fold_and_bin (lightcurve *lc, double period, double dt,
     return folded;
 }
 
-double test_epoch(lightcurve *lc, int nbins)
+void test_epoch(lightcurve *lc, int nbins, double *depth, int *epoch)
 {
     int i, j, n, m;
-    double depth, w, max_depth = -1.0;
+    double depth0, w;
+    *depth = -1.0;
+    *epoch = -1.0;
     for (i = 0, n = lc->length; i < n; ++i) {
-        depth = 0.0;
+        depth0 = 0.0;
         w = 0.0;
         for (j = 0; j < nbins; ++j) {
             m = (i + j) % n;
-            depth += lc->flux[m] * lc->ivar[m];
+            depth0 += lc->flux[m] * lc->ivar[m];
             w += lc->ivar[m];
         }
-        depth = (1 - depth / w);
-        if (depth > max_depth) max_depth = depth;
+        depth0 = (1 - depth0 / w);
+        if (depth0 > *depth) {
+            *depth = depth0;
+            *epoch = i;
+        }
     }
-    return max_depth;
 }
 
 // MEDIANS.

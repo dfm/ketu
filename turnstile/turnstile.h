@@ -15,6 +15,6 @@ void lightcurve_compute_extent (lightcurve *lc);
 
 lightcurve *lightcurve_fold_and_bin (lightcurve *lc, double period, double dt,
                                      int method);
-double test_epoch(lightcurve *lc, int nbins);
+void test_epoch(lightcurve *lc, int nbins, double *depth, int *epoch);
 
 #endif

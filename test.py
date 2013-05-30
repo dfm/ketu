@@ -27,40 +27,44 @@ if __name__ == "__main__":
             continue
         ds = kplr.Dataset(d.fetch().filename, untrend=True)
         data.append(ds)
-        time.append(ds.time[ds.mask])
-        flux.append(ds.flux[ds.mask])
-        ivar.append(ds.ivar[ds.mask])
+        time.append(ds.time[ds.mask * ds.qualitymask])
+        flux.append(ds.flux[ds.mask * ds.qualitymask])
+        ivar.append(ds.ivar[ds.mask * ds.qualitymask])
 
     time = np.concatenate(time)
     flux = np.concatenate(flux)
     ivar = np.concatenate(ivar)
 
-    inds = (time < 1185) + (time > 1188)
-    time = time[inds]
-    flux = flux[inds]
-    ivar = ivar[inds]
-
     pl.plot(time, flux, ".k")
     pl.savefig("sup.png")
-    # assert 0
 
     strt = timer.time()
-    periods, depths = _turnstile.find_periods(time, flux, ivar, 100, 1.5 * 365,
-                                              0.1, 0.3)
+    # periods, depths, epochs = _turnstile.find_periods(time, flux, ivar,
+    #                                                   100, 1.5 * 365,
+    #                                                   0.1, 0.3)
+    periods, depths, epochs = _turnstile.find_periods(time, flux, ivar,
+                                                      100, 300,
+                                                      0.1, 0.3)
+    # periods, depths, epochs = _turnstile.find_periods(time, flux, ivar,
+    #                                                   period - 10,
+    #                                                   period + 10,
+    #                                                   0.1, 0.3)
     print("Took {0} minutes.".format((timer.time() - strt) / 60.))
 
     pl.clf()
     pl.plot(periods, depths, "k")
-    pl.gca().axvline(122.3874, alpha=0.3)
-    pl.gca().axvline(267.291, alpha=0.3)
+    # pl.gca().axvline(122.3874, alpha=0.3)
+    # pl.gca().axvline(267.291, alpha=0.3)
     pl.xlabel("Period [days]")
     pl.ylabel("Transit Depth")
-
-    # pl.gca().axvline(267.291, alpha=0.3)
-    # pl.plot(time % (periods[np.argmax(depths)]), flux, ".k", alpha=0.3)
-    # pl.plot(time % 267.291, flux, ".k", alpha=0.3)
-    # pl.ylim(0.998, 1.002)
-    # pl.xlim(40, 45)
-    # pl.xlim(t0 - 1, t0 + 1)
-
     pl.savefig("blah.png")
+
+    for i, ind in enumerate(np.argsort(depths)[::-1][:300]):
+        demo_period = periods[ind]
+        demo_epoch = epochs[ind]
+
+        pl.clf()
+        pl.plot(time % demo_period - demo_epoch, flux, ".k")
+        pl.title("{0} days".format(demo_period))
+        pl.xlim(-2, 2)
+        pl.savefig("figs/sup-{0:03d}.png".format(i))

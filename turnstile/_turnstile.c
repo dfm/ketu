@@ -57,17 +57,20 @@ static PyObject
     npy_intp pdim[1] = {nperiods};
 
     PyArrayObject *period_array = (PyArrayObject*)PyArray_SimpleNew(1, pdim, NPY_DOUBLE),
-                  *depth_array = (PyArrayObject*)PyArray_SimpleNew(1, pdim, NPY_DOUBLE);
+                  *depth_array = (PyArrayObject*)PyArray_SimpleNew(1, pdim, NPY_DOUBLE),
+                  *epoch_array = (PyArrayObject*)PyArray_SimpleNew(1, pdim, NPY_DOUBLE);
     double *periods = (double*)PyArray_DATA(period_array),
-           *depths = (double*)PyArray_DATA(depth_array);
+           *depths = (double*)PyArray_DATA(depth_array),
+           *epochs = (double*)PyArray_DATA(epoch_array);
 
-    int i;
+    int i, eind;
     for (i = 0; i < nperiods; ++i) {
         double period = periods[i] = min_period + i * dperiod;
-        tau = 0.5 * exp(0.44 * log(period) - 2.97);
-        lightcurve *folded = lightcurve_fold_and_bin(data, period, 0.5 * tau,
+        tau = 0.25 * exp(0.44 * log(period) - 2.97);
+        lightcurve *folded = lightcurve_fold_and_bin(data, period, tau,
                                                      1);
-        depths[i] = test_epoch(folded, 2);
+        test_epoch(folded, 2, &(depths[i]), &eind);
+        epochs[i] = tau * (eind + 0.5);
         free(folded);
     }
 
@@ -76,7 +79,7 @@ static PyObject
     Py_DECREF(ivar_array);
     free(data);
 
-    PyObject *ret = Py_BuildValue("OO", period_array, depth_array);
+    PyObject *ret = Py_BuildValue("OOO", period_array, depth_array, epoch_array);
     return ret;
 }
 
