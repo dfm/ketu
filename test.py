@@ -42,24 +42,25 @@ if __name__ == "__main__":
     # periods, depths, epochs = _turnstile.find_periods(time, flux, ivar,
     #                                                   100, 1.5 * 365,
     #                                                   0.1, 0.3)
-    periods, depths, epochs = _turnstile.find_periods(time, flux, ivar,
-                                                      100, 300,
-                                                      0.1, 0.3)
-    # periods, depths, epochs = _turnstile.find_periods(time, flux, ivar,
-    #                                                   period - 10,
-    #                                                   period + 10,
-    #                                                   0.1, 0.3)
+    periods, depths, epochs, chi2 = _turnstile.find_periods(time, flux, ivar,
+                                                            100, 300,
+                                                            0.1, 0.3)
+    # periods, depths, epochs, chi2 = _turnstile.find_periods(time, flux, ivar,
+    #                                                         period - 10,
+    #                                                         period + 10,
+    #                                                         0.1, 0.3)
     print("Took {0} minutes.".format((timer.time() - strt) / 60.))
 
     pl.clf()
-    pl.plot(periods, depths, "k")
-    # pl.gca().axvline(122.3874, alpha=0.3)
-    # pl.gca().axvline(267.291, alpha=0.3)
+    pl.plot(periods, chi2, "k")
+    pl.gca().axvline(122.3874, alpha=0.3)
+    pl.gca().axvline(267.291, alpha=0.3)
     pl.xlabel("Period [days]")
     pl.ylabel("Transit Depth")
+    # pl.gca().set_ylim(chi2.min(), 0)
     pl.savefig("blah.png")
 
-    for i, ind in enumerate(np.argsort(depths)[::-1][:300]):
+    for i, ind in enumerate(np.argsort(chi2)[:20]):
         demo_period = periods[ind]
         demo_epoch = epochs[ind]
 

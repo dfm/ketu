@@ -52,26 +52,32 @@ static PyObject
     data->flux = (double*)PyArray_DATA(flux_array);
     data->ivar = (double*)PyArray_DATA(ivar_array);
 
-    // Find the periods.
+    // Loop over period and compute the best depth and epoch.
     int nperiods = (int)((max_period - min_period) / dperiod) + 1;
     npy_intp pdim[1] = {nperiods};
 
     PyArrayObject *period_array = (PyArrayObject*)PyArray_SimpleNew(1, pdim, NPY_DOUBLE),
                   *depth_array = (PyArrayObject*)PyArray_SimpleNew(1, pdim, NPY_DOUBLE),
-                  *epoch_array = (PyArrayObject*)PyArray_SimpleNew(1, pdim, NPY_DOUBLE);
+                  *epoch_array = (PyArrayObject*)PyArray_SimpleNew(1, pdim, NPY_DOUBLE),
+                  *chi2_array = (PyArrayObject*)PyArray_SimpleNew(1, pdim, NPY_DOUBLE);
     double *periods = (double*)PyArray_DATA(period_array),
            *depths = (double*)PyArray_DATA(depth_array),
-           *epochs = (double*)PyArray_DATA(epoch_array);
+           *epochs = (double*)PyArray_DATA(epoch_array),
+           *chi2 = (double*)PyArray_DATA(chi2_array);
 
-    int i, eind;
+    double period;
+    int i, eind, factor = 2;
     for (i = 0; i < nperiods; ++i) {
-        double period = periods[i] = min_period + i * dperiod;
-        tau = 0.25 * exp(0.44 * log(period) - 2.97);
-        lightcurve *folded = lightcurve_fold_and_bin(data, period, tau,
-                                                     1);
-        test_epoch(folded, 2, &(depths[i]), &eind);
-        epochs[i] = tau * (eind + 0.5);
+        period = periods[i] = min_period + i * dperiod;
+        tau = 0.5 * exp(0.44 * log(period) - 2.97);
+        lightcurve *folded = lightcurve_fold_and_bin(data, period,
+                                                     tau / factor, 1);
+        test_epoch(folded, factor, &(depths[i]), &eind);
+        epochs[i] = (tau / factor) * eind;
         free(folded);
+
+        // Compute chi^2 at the best depth + epoch.
+        chi2[i] = compute_chi2(data, period, depths[i], epochs[i], tau);
     }
 
     Py_DECREF(time_array);
@@ -79,7 +85,8 @@ static PyObject
     Py_DECREF(ivar_array);
     free(data);
 
-    PyObject *ret = Py_BuildValue("OOO", period_array, depth_array, epoch_array);
+    PyObject *ret = Py_BuildValue("OOOO", period_array, depth_array, epoch_array,
+                                  chi2_array);
     return ret;
 }
 

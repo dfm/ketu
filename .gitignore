@@ -8,3 +8,5 @@ turnstile/_bls*
 *.pyc
 *.png
 .syntastic_c_config
+dist
+*.egg-info

@@ -124,6 +124,29 @@ void test_epoch(lightcurve *lc, int nbins, double *depth, int *epoch)
     }
 }
 
+double compute_chi2(lightcurve *lc, double period, double depth, double epoch,
+                    double dt)
+{
+    int i, n = lc->length;
+    double t, tdt = 2 * dt, chi2 = 0.0, dchi2 = 0.0, chi, omd = 1 - depth, c2;
+    for (i = 0; i < n; ++i) {
+        t = fmod(lc->time[i] - epoch, period);
+        if (t <= dt) {
+            chi = (omd - lc->flux[i]) * lc->ivar[i];
+            c2 = chi * chi;
+            chi2 += c2;
+            dchi2 += c2;
+
+            chi = (1.0 - lc->flux[i]) * lc->ivar[i];
+            dchi2 -= chi * chi;
+        } else if (t <= tdt) {
+            chi = (1.0 - lc->flux[i]) * lc->ivar[i];
+            chi2 += chi * chi;
+        }
+    }
+    return dchi2 / chi2;
+}
+
 // MEDIANS.
 #define ELEM_SWAP(a,b) { register double t=(a);(a)=(b);(b)=t; }
 double quick_select(double arr[], int n)
