@@ -127,24 +127,70 @@ void test_epoch(lightcurve *lc, int nbins, double *depth, int *epoch)
 double compute_chi2(lightcurve *lc, double period, double depth, double epoch,
                     double dt)
 {
-    int i, n = lc->length;
-    double t, tdt = 2 * dt, chi2 = 0.0, dchi2 = 0.0, chi, omd = 1 - depth, c2;
-    for (i = 0; i < n; ++i) {
-        t = fmod(lc->time[i] - epoch, period);
-        if (t <= dt) {
-            chi = (omd - lc->flux[i]) * lc->ivar[i];
-            c2 = chi * chi;
-            chi2 += c2;
-            dchi2 += c2;
+    // int i, n = lc->length;
+    // double t, tdt = 2 * dt, chi2 = 0.0, dchi2 = 0.0, chi, omd = 1 - depth, c2;
+    // for (i = 0; i < n; ++i) {
+    //     t = fmod(lc->time[i] - epoch, period);
+    //     if (t <= dt) {
+    //         chi = (omd - lc->flux[i]) * lc->ivar[i];
+    //         c2 = chi * chi;
+    //         chi2 += c2;
+    //         dchi2 += c2;
 
-            chi = (1.0 - lc->flux[i]) * lc->ivar[i];
-            dchi2 -= chi * chi;
-        } else if (t <= tdt) {
-            chi = (1.0 - lc->flux[i]) * lc->ivar[i];
-            chi2 += chi * chi;
+    //         chi = (1.0 - lc->flux[i]) * lc->ivar[i];
+    //         dchi2 -= chi * chi;
+    //     } else if (t <= tdt) {
+    //         chi = (1.0 - lc->flux[i]) * lc->ivar[i];
+    //         chi2 += chi * chi;
+    //     }
+    // }
+    // return dchi2 / chi2;
+
+    int i, n = lc->length, it,
+        count = 0,
+        ndata, nleftout,
+        nt, ntmax = ceil(1550.0 / period); // 4.25 yrs.
+    double t, d, w, leftout[500], loivar[500], chi, chi2 = 0.0;
+
+    // Loop over transits and leave each one out in turn.
+    for (nt = 0; nt < ntmax; ++nt) {
+        d = 0.0;
+        w = 0.0;
+
+        // Compute the maximum likelihood depth based on the other transits.
+        ndata = 0;
+        nleftout = 0;
+        for (i = 0; i < n; ++i) {
+            t = fmod(lc->time[i] - epoch, period);
+            it = (int) ((lc->time[i] - epoch) / period);
+
+            if (t <= dt) {
+                if (it != nt) {
+                    ndata++;
+                    d += lc->flux[i] * lc->ivar[i];
+                    w += lc->ivar[i];
+                } else if (nleftout < 500) {
+                    leftout[nleftout] = lc->flux[i];
+                    loivar[nleftout++] = lc->ivar[i];
+                }
+            }
+        }
+
+        // Normalize the
+        d /= w;
+
+        if (ndata > 0 && nleftout > 0) {
+            count++;
+            for (i = 0; i < nleftout; i++) {
+                chi = (leftout[i] - d) * loivar[i];
+                chi2 += chi * chi / nleftout;
+            }
         }
     }
-    return dchi2 / chi2;
+
+    if (count > 0)
+        return chi2 / count;
+    return 1e100;
 }
 
 // MEDIANS.
