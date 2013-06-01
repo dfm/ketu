@@ -54,18 +54,19 @@ if __name__ == "__main__":
     pl.clf()
     pl.plot(periods, chi2, "k")
     pl.gca().axvline(122.3874, alpha=0.3)
-    pl.gca().axvline(267.291, alpha=0.3)
+    # pl.gca().axvline(267.291, alpha=0.3)
     pl.xlabel("Period [days]")
     pl.ylabel("Transit Depth")
     # pl.gca().set_ylim(chi2.min(), 0)
     pl.savefig("blah.png")
 
+    dt = time.max() - time.min()
     for i, ind in enumerate(np.argsort(chi2)[:20]):
         demo_period = periods[ind]
         demo_epoch = epochs[ind]
 
         pl.clf()
-        pl.plot(time % demo_period - demo_epoch, flux, ".k")
+        pl.scatter(time % demo_period - demo_epoch, flux, c=time / dt)
         pl.title("{0} days".format(demo_period))
         pl.xlim(-2, 2)
         pl.savefig("figs/sup-{0:03d}.png".format(i))

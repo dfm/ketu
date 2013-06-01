@@ -176,21 +176,27 @@ double compute_chi2(lightcurve *lc, double period, double depth, double epoch,
             }
         }
 
-        // Normalize the
-        d /= w;
+        // Loop over the left out data to compute the LOO chi^2.
+        if (ndata > 0 && nleftout > 0 && d / w < 1.0) {
+            // Normalize the depth estimate.
+            d /= w;
 
-        if (ndata > 0 && nleftout > 0) {
             count++;
             for (i = 0; i < nleftout; i++) {
                 chi = (leftout[i] - d) * loivar[i];
                 chi2 += chi * chi / nleftout;
+
+                chi = (leftout[i] - 1) * loivar[i];
+                chi2 -= chi * chi / nleftout;
             }
+            // chi = d - (1 - depth);
+            // chi2 += chi * chi;
         }
     }
 
     if (count > 0)
         return chi2 / count;
-    return 1e100;
+    return 0.0;
 }
 
 // MEDIANS.
