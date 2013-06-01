@@ -183,11 +183,11 @@ double compute_chi2(lightcurve *lc, double period, double depth, double epoch,
 
             count++;
             for (i = 0; i < nleftout; i++) {
-                chi = (leftout[i] - d) * loivar[i];
-                chi2 += chi * chi / nleftout;
+                chi = leftout[i] - d;
+                chi2 += chi * chi * loivar[i];
 
-                chi = (leftout[i] - 1) * loivar[i];
-                chi2 -= chi * chi / nleftout;
+                chi = leftout[i] - 1;
+                chi2 -= chi * chi * loivar[i];
             }
             // chi = d - (1 - depth);
             // chi2 += chi * chi;
@@ -195,7 +195,7 @@ double compute_chi2(lightcurve *lc, double period, double depth, double epoch,
     }
 
     if (count > 0)
-        return chi2 / count;
+        return chi2;
     return 0.0;
 }
 
