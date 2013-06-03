@@ -15,8 +15,9 @@ void lightcurve_compute_extent (lightcurve *lc);
 
 lightcurve *lightcurve_fold_and_bin (lightcurve *lc, double period, double dt,
                                      int method);
+
+double get_duration(double period);
 void test_epoch(lightcurve *lc, int nbins, double *depth, int *epoch);
-double compute_chi2(lightcurve *lc, double period, double depth, double epoch,
-                    double dt);
+double compute_chi2(lightcurve *lc, double period, double epoch, double dt);
 
 #endif
