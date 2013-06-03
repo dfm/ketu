@@ -162,7 +162,7 @@ double compute_chi2(lightcurve *lc, double period, double epoch, double dt)
         }
 
         // Loop over the left out data to compute the LOO chi^2.
-        if (ndata > 0 && nleftout > 0 && d / w < 1.0) {
+        if (ndata > 0 && nleftout > 0) {
             // Normalize the depth estimate.
             d /= w;
 
@@ -179,6 +179,8 @@ double compute_chi2(lightcurve *lc, double period, double epoch, double dt)
 
     if (count > 0)
         return chi2;
+
+    printf("ahhhh %f\n", period);
     return 0.0;
 }
 

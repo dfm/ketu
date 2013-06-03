@@ -42,15 +42,19 @@ if __name__ == "__main__":
     # periods, depths, epochs = _turnstile.find_periods(time, flux, ivar,
     #                                                   100, 1.5 * 365,
     #                                                   0.1)
-    # periods, depths, epochs, chi2 = _turnstile.find_periods(time, flux, ivar,
-    #                                                         100, 300,
-    #                                                         0.05)
     periods, depths, epochs, chi2 = _turnstile.find_periods(time, flux, ivar,
-                                                            190, 210,
+                                                            100, 300,
                                                             0.05)
+    # periods, depths, epochs, chi2 = _turnstile.find_periods(time, flux, ivar,
+    #                                                         190, 210,
+    #                                                         0.05)
     # periods, depths, epochs, chi2 = _turnstile.find_periods(time, flux, ivar,
     #                                                         period - 10,
     #                                                         period + 10,
+    #                                                         0.1)
+    # periods, depths, epochs, chi2 = _turnstile.find_periods(time, flux, ivar,
+    #                                                         59,
+    #                                                         63,
     #                                                         0.1)
     print("Took {0} minutes.".format((timer.time() - strt) / 60.))
 
@@ -64,23 +68,40 @@ if __name__ == "__main__":
     pl.savefig("blah.png")
 
     dt = time.max() - time.min()
-    pl.figure(figsize=(16, 16))
-    for i, ind in enumerate(np.argsort(chi2)[:1]):
+    pl.figure(figsize=(20, 16))
+    for i, ind in enumerate(np.argsort(chi2)[:100]):
+        print("\nPeriod: {0}".format(periods[ind]))
         pl.clf()
-        for j, f in enumerate([1, 2, 3, 5, 7, 11, 13, 17, 19]):
+        chi2_min = None
+        duration0 = 0.5 * np.exp(0.44 * np.log(periods[ind]) - 2.97)
+        for j, f in enumerate([1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31]):
             demo_period = periods[ind] / f
             demo_epoch = epochs[ind]
 
-            print(f,
-                  _turnstile.compute_chi2(time, flux, ivar,
-                                          demo_period, demo_epoch))
+            duration = 0.5 * np.exp(0.44 * np.log(demo_period) - 2.97)
 
-            pl.subplot(3, 3, j + 1)
+            c2 = np.min([_turnstile.compute_chi2(time, flux, ivar,
+                                                 demo_period,
+                                                 demo_epoch + off)
+                         for off in np.arange(0, duration0, 0.5 * duration)])
+            print(j, demo_period, c2)
+            if chi2_min is None:
+                chi2_min = c2
+            elif c2 < chi2_min:
+                c2 = None
+                break
+
+            pl.subplot(3, 4, j + 1)
             pl.plot((time - demo_epoch + 0.5 * demo_period) % demo_period
-                    - 0.5 * demo_period,
-                    flux + 0.001 * np.array((time - demo_epoch)
-                                            / demo_period, dtype=int),
+                    - 0.5 * demo_period + 0.5 * duration0 - 0.5 * duration,
+                    flux + 0.0 * np.array((time - demo_epoch)
+                                          / demo_period, dtype=int),
                     ".k", ms=1)
             pl.title("{0} days".format(demo_period))
             pl.xlim(-2, 2)
+
+        if c2 is not None:
+            print("made it.")
             pl.savefig("figs/sup-{0:03d}.png".format(i))
+        else:
+            print("didn't.")
