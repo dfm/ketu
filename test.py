@@ -14,18 +14,24 @@ from turnstile import _turnstile
 
 if __name__ == "__main__":
     client = kplr.API()
-    planet = client.planet("62e").koi
-    period = planet.koi_period
-    t0 = planet.koi_time0bk % period
+    # planet = client.koi("2311.01")
+    # planet = client.planet("62e").koi
+    # period = planet.koi_period
+    # t0 = planet.koi_time0bk % period
+
+    star = client.planet("62e").koi
+    # star = client.star("10124866")
+    # star = client.star("5108214")
 
     data = []
     time = []
     flux = []
     ivar = []
-    for d in planet.data:
+    for d in star.data:
         if "slc" in d.filename:
             continue
-        ds = kplr.Dataset(d.fetch().filename, untrend=True)
+        ds = kplr.Dataset(d.fetch().filename, untrend=True,
+                          fill_times=1, dt=1)
         data.append(ds)
         time.append(ds.time[ds.mask * ds.qualitymask])
         flux.append(ds.flux[ds.mask * ds.qualitymask])
@@ -37,6 +43,12 @@ if __name__ == "__main__":
 
     pl.plot(time, flux, ".k")
     pl.savefig("sup.png")
+
+    pl.clf()
+
+    # pl.plot((time - t0 + 0.5 * period) % period - 0.5 * period, flux, ".k")
+    # pl.xlim(-1, 1)
+    # pl.savefig("sup-folded.png")
 
     strt = timer.time()
     # periods, depths, epochs = _turnstile.find_periods(time, flux, ivar,
@@ -60,8 +72,9 @@ if __name__ == "__main__":
 
     pl.clf()
     pl.plot(periods, chi2, "k")
-    pl.gca().axvline(122.3874, alpha=0.3)
-    pl.gca().axvline(267.291, alpha=0.3)
+    # pl.gca().axvline(122.3874, alpha=0.3)
+    # pl.gca().axvline(267.291, alpha=0.3)
+    # pl.gca().axvline(191.8857, alpha=0.3)
     pl.xlabel("Period [days]")
     pl.ylabel(r"$\chi^2$")
     pl.gca().set_ylim(chi2.min(), 0)
