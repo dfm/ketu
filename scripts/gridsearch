@@ -1,0 +1,135 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import (division, print_function, absolute_import,
+                        unicode_literals)
+
+__all__ = ["run_grid_search"]
+
+import kplr
+from kplr.ld import get_quad_coeffs
+import argparse
+import numpy as np
+import cPickle as pickle
+import matplotlib.pyplot as pl
+
+import bart
+from bart import _grid
+from bart.data import LightCurve
+
+parser = argparse.ArgumentParser(
+    description="Part of speech tagging.")
+parser.add_argument("kicid",
+                    help="The KIC ID of the star that you want to search.")
+parser.add_argument("periods", nargs=2, type=float,
+                    help="The minimum and maximum periods to try.")
+parser.add_argument("--dfreq", default=2e-6, type=float,
+                    help="The spacing in the frequency grid.")
+parser.add_argument("--dphase", default=0.3, type=float,
+                    help="The fractional spacing of the phase grid "
+                    "in units of the duration.")
+parser.add_argument("--depth", default=80., type=float,
+                    help="The depth of transit to test in ppm.")
+parser.add_argument("--duration", default=0.5, type=float,
+                    help="The duration of transit to test in days.")
+parser.add_argument("--no-mask-kois", action="store_true",
+                    help="If provided, don't mask known KOIs in the dataset.")
+parser.add_argument("-i", "--inject", default=None, type=float, nargs=2,
+                    help="Inject a transit at the given period and r/R.")
+
+
+def run_grid_search(kicid, min_period, max_period, dfreq, dphase, depth,
+                    duration, mask_kois=True, hyperpars=[1e-3, 2.0, 5.2],
+                    inject=None):
+    # Download the data from MAST.
+    client = kplr.API()
+    star = client.star(kicid)
+    kois = star.kois
+    lcs = star.get_light_curves(short_cadence=False)
+    assert len(lcs), "No data for KIC {0}".format(kicid)
+
+    # If injecting, sample a phase and impact parameter.
+    if inject is not None:
+        injected_period, injected_r = inject
+        injected_t0 = injected_period * np.random.rand()
+        injected_b = np.random.rand()
+        print("""Injecting transit at:
+    P = {period} days
+    t0 = {t0} days
+    r/R = {r}
+    b/R = {b}
+        """.format(
+            period=injected_period,
+            t0=injected_t0,
+            b=injected_b,
+            r=injected_r,
+        ))
+
+        # Set up the model.
+        mu1, mu2 = get_quad_coeffs(star.kic_teff)
+        star = bart.Star(ldp=bart.ld.QuadraticLimbDarkening(mu1, mu2, 100))
+        planet = bart.Planet(r=injected_r, period=injected_period,
+                             t0=injected_t0, b=injected_b)
+        system = bart.PlanetarySystem(star)
+        system.add_planet(planet)
+
+    # Load the data into Bart formats.
+    datasets = []
+    for lc in lcs:
+        data = lc.read()
+        time = data["TIME"]
+        flux, ferr = data["SAP_FLUX"], data["SAP_FLUX_ERR"]
+        quality = data["SAP_QUALITY"]
+
+        # Drop "bad" data.
+        inds = ((quality == 0) * np.isfinite(time) * np.isfinite(flux)
+                * np.isfinite(ferr))
+        time, flux, ferr = time[inds], flux[inds], ferr[inds]
+
+        # Mask known KOIs.
+        if mask_kois and len(kois):
+            for koi in kois:
+                P, t0, d = koi.koi_period, koi.koi_time0bk, koi.koi_duration
+                t0 = t0 % P
+                m = np.abs((time - t0 + 0.5 * P) % P - 0.5 * P) > 2 * d
+                time, flux, ferr = time[m], flux[m], ferr[m]
+
+        # Inject a fake transit.
+        if inject is not None:
+            flux *= system.light_curve(time)
+
+        # Automatically split the data at gaps.
+        datasets += LightCurve(time, flux, ferr).autosplit()
+
+    # Get rid of datasets with too few points.
+    datasets = [d for d in datasets if len(d.time) > 10]
+    print(len(datasets))
+    print([len(d.time) for d in datasets])
+
+    # Plot the injection folded at the right period.
+    if inject is not None:
+        t0, P = injected_t0, injected_period
+        hp = 0.5 * P
+        offset = 1e-3
+        [pl.plot((ds.time-t0+hp) % P-hp,
+                 ds.flux + offset*(ds.time-(ds.time-t0+hp) % P-hp)/P,
+                 ".")
+         for ds in datasets]
+        pl.xlim(-2, 2)
+        pl.savefig("data.png")
+
+    # Build the period grid.
+    periods = 1/np.arange(1/max_period, 1/min_period+dfreq, dfreq)
+
+    # Run the grid search.
+    results = _grid.search(datasets, periods, duration, depth * 1e-6,
+                           dphase, hyperpars)
+    pickle.dump((periods, results), open("results.pkl", "wb"), -1)
+
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+    periods = sorted(args.periods)
+    run_grid_search(args.kicid, periods[0], periods[1], args.dfreq,
+                    args.dphase, args.depth, args.duration, inject=args.inject,
+                    mask_kois=not args.no_mask_kois)

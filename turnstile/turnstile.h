@@ -1,23 +1,35 @@
 #ifndef _TURNSTILE_H_
 #define _TURNSTILE_H_
 
-typedef struct lightcurve {
+typedef struct turnstile_struct {
 
-    int length;
-    double *time, *flux, *ivar;
-    double min_time, max_time;
+    int ndatasets;
+    int *ndata;
+    double duration;
+    double **time;
+    double **delta_lnlike;
 
-} lightcurve;
+} turnstile;
 
-lightcurve *lightcurve_alloc (int length);
-void lightcurve_free (lightcurve *lc);
-void lightcurve_compute_extent (lightcurve *lc);
+turnstile *turnstile_allocate (
+    double duration,
+    double depth,
+    int ndatasets,
+    int *ndata,
+    double **time,
+    double **flux,
+    double **ferr,
+    double *hyperpars
+);
+void turnstile_free (turnstile *self);
 
-lightcurve *lightcurve_fold_and_bin (lightcurve *lc, double period, double dt,
-                                     int method);
-
-double get_duration(double period);
-void test_epoch(lightcurve *lc, int nbins, double *depth, int *epoch);
-double compute_chi2(lightcurve *lc, double period, double epoch, double dt);
+void turnstile_evaluate (
+    double period,
+    int nphases,
+    double *phases,
+    double *lnlikes,
+    turnstile *self
+);
 
 #endif
+// /_TURNSTILE_H_

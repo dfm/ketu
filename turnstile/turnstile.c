@@ -1,240 +1,124 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
+#include "math.h"
+#include "stdio.h"
+#include "stdlib.h"
+#include "george.h"
 #include "turnstile.h"
 
-double get_duration(double period)
+turnstile *turnstile_allocate (
+    double duration,
+    double depth,
+    int ndatasets,
+    int *ndata,
+    double **time,
+    double **flux,
+    double **ferr,
+    double *hyperpars
+)
 {
-    return 0.5 * exp(0.44 * log(period) - 2.97);
+    int i, j, k;
+
+    // Allocate the turnstile object.
+    turnstile *self = malloc(sizeof(turnstile));
+    self->ndatasets = ndatasets;
+    self->ndata = ndata;
+    self->duration = duration;
+    self->time = malloc(ndatasets * sizeof(double*));
+    self->delta_lnlike = malloc(ndatasets * sizeof(double*));
+
+    george_gp *gp;
+    double *model, null, t0;
+    for (i = 0; i < ndatasets; ++i) {
+        // Set up the Gaussian process.
+        gp = george_allocate_gp (3, hyperpars, NULL, *george_kernel);
+        george_compute (ndata[i], time[i], ferr[i], gp);
+
+        // Compute the null likelihood.
+        model = malloc(ndata[i] * sizeof(double));
+        for (j = 0; j < ndata[i]; ++j) model[j] = flux[i][j] - 1.0;
+        null = george_log_likelihood(model, gp);
+
+        // Loop over the data points and compute the delta log-likelihood at
+        // each phase.
+        self->delta_lnlike[i] = malloc(ndata[i] * sizeof(double));
+        self->time[i] = malloc(ndata[i] * sizeof(double));
+        for (j = 0; j < ndata[i]; ++j) {
+            self->time[i][j] = t0 = time[i][j];
+            for (k = 0; k < ndata[i]; ++k) {
+                if (fabs(time[i][k] - t0) < duration)
+                    model[k] = flux[i][k] - 1.0 + depth;
+                else
+                    model[k] = flux[i][k] - 1.0;
+            }
+            self->delta_lnlike[i][j] = george_log_likelihood(model, gp)
+                                       - null;
+        }
+
+        free(model);
+        george_free_gp(gp);
+    }
+    return self;
 }
 
-double quick_select(double arr[], int n);
-
-lightcurve *lightcurve_alloc (int length)
+void turnstile_free (turnstile *self)
 {
     int i;
-    lightcurve *lc = malloc(sizeof(lightcurve));
-    lc->length = length;
-    lc->time = malloc(length * sizeof(double));
-    lc->flux = malloc(length * sizeof(double));
-    lc->ivar = malloc(length * sizeof(double));
-
-    for (i = 0; i < length; ++i) {
-        lc->flux[i] = 0.0;
-        lc->ivar[i] = 0.0;
+    for (i = 0; i < self->ndatasets; ++i) {
+        free(self->time[i]);
+        free(self->delta_lnlike[i]);
     }
-
-    lc->min_time = -1;
-    lc->max_time = -1;
-    return lc;
+    free(self->time);
+    free(self->delta_lnlike);
+    free(self);
 }
 
-void lightcurve_free (lightcurve *lc)
+void turnstile_evaluate (double period, int nphases, double *phases,
+                         double *lnlikes, turnstile *self)
 {
-    free(lc->time);
-    free(lc->flux);
-    free(lc->ivar);
-    free(lc);
-}
+    int i, j, k;
+    double *folded, phase, best, prev, dist, max_ll, max_phase;
 
-void lightcurve_compute_extent (lightcurve *lc)
-{
-    int i, n;
-    double *t = lc->time;
-    double mx = t[0], mn = t[0];
-    for (i = 1, n = lc->length; i < n; ++i) {
-        if (t[i] < mn) mn = t[i];
-        if (t[i] > mx) mx = t[i];
-    }
-    lc->min_time = mn;
-    lc->max_time = mx;
-}
+    for (i = 0; i < nphases; ++i) lnlikes[i] = 0.0;
 
-lightcurve *lightcurve_fold_and_bin (lightcurve *lc, double period, double dt,
-                                     int method)
-{
-    int i, n = lc->length, bin;
+    for (i = 0; i < self->ndatasets; ++i) {
+        // Compute the period folded phases of each data point.
+        folded = malloc(self->ndata[i] * sizeof(double));
+        for (j = 0; j < self->ndata[i]; ++j)
+            folded[j] = fmod(self->time[i][j], period);
 
-    int nbins = (int)(period / dt) + 1;
-    if (nbins == 0) nbins = 1;
+        // Loop over test phases.
+        for (j = 0; j < nphases; ++j) {
+            phase = phases[j];
 
-    lightcurve *folded = lightcurve_alloc(nbins);
-    for (i = 0; i < nbins; ++i)
-        folded->time[i] = i * dt + 0.5 * dt;
-
-    if (method == 0) { // Weighted mean.
-        for (i = 0; i < n; ++i) {
-            bin = (int)(fmod(lc->time[i], period) / dt);
-            if (bin >= nbins) {
-                fprintf(stderr, "Index failure (t=%f)\n", lc->time[i]);
-                bin = nbins - 1;
-            }
-            folded->flux[bin] += lc->flux[i] * lc->ivar[i];
-            folded->ivar[bin] += lc->ivar[i];
-        }
-
-        for (i = 0; i < nbins; ++i)
-            folded->flux[i] /= folded->ivar[i];
-
-    } else if (method == 1) { // Median.
-        int *counts = malloc(nbins * sizeof(int));
-        double **samples = malloc(nbins * sizeof(double*));
-
-        for (i = 0; i < nbins; ++i) {
-            counts[i] = 0;
-            samples[i] = malloc(n * sizeof(double));
-        }
-
-        for (i = 0; i < n; ++i) {
-            bin = (int)(fmod(lc->time[i], period) / dt);
-            if (bin >= nbins) {
-                fprintf(stderr, "Index failure (t=%f)\n", lc->time[i]);
-                bin = nbins - 1;
-            }
-            samples[bin][counts[bin]++] = lc->flux[i];
-            folded->ivar[bin] += lc->ivar[i];
-        }
-
-        for (bin = 0; bin < nbins; ++bin) {
-            folded->flux[bin] = quick_select(samples[bin], counts[bin]);
-            free(samples[bin]);
-        }
-
-        free(samples);
-        free(counts);
-    }
-
-    return folded;
-}
-
-void test_epoch(lightcurve *lc, int nbins, double *depth, int *epoch)
-{
-    int i, j, n, m;
-    double depth0, w;
-    *depth = -1.0;
-    *epoch = -1.0;
-    for (i = 0, n = lc->length; i < n; ++i) {
-        depth0 = 0.0;
-        w = 0.0;
-        for (j = 0; j < nbins; ++j) {
-            m = (i + j) % n;
-            depth0 += lc->flux[m] * lc->ivar[m];
-            w += lc->ivar[m];
-        }
-        depth0 = (1 - depth0 / w);
-        if (depth0 > *depth) {
-            *depth = depth0;
-            *epoch = i;
-        }
-    }
-}
-
-double compute_chi2(lightcurve *lc, double period, double epoch, double dt)
-{
-    int i, n = lc->length, it,
-        count = 0,
-        ndata, nleftout,
-        nt, ntmax = ceil(1550.0 / period); // 4.25 yrs.
-    double t, d, w, leftout[500], loivar[500], chi, chi2 = 0.0;
-
-    // Loop over transits and leave each one out in turn.
-    for (nt = 0; nt < ntmax; ++nt) {
-        d = 0.0;
-        w = 0.0;
-
-        // Compute the maximum likelihood depth based on the other transits.
-        ndata = 0;
-        nleftout = 0;
-        for (i = 0; i < n; ++i) {
-            t = fmod(lc->time[i] - epoch, period);
-            it = (int) ((lc->time[i] - epoch) / period);
-
-            if (t <= dt) {
-                if (it != nt) {
-                    ndata++;
-                    d += lc->flux[i] * lc->ivar[i];
-                    w += lc->ivar[i];
-                } else if (nleftout < 500) {
-                    leftout[nleftout] = lc->flux[i];
-                    loivar[nleftout++] = lc->ivar[i];
+            // Find the closest ln-like measurement (assuming that the times
+            // are properly sorted).
+            prev = -1.0;
+            best = 0.0;
+            for (k = 0; k < self->ndata[i]; ++k) {
+                dist = fabs(folded[k] - phase);
+                if (prev > 0.0 && (dist > prev || k == self->ndata[i]-1)
+                        && dist < self->duration) {
+                    best = self->delta_lnlike[i][k - 1];
+                    break;
                 }
+                prev = dist;
             }
+
+            // Update the log likelihood.
+            lnlikes[j] += best;
         }
 
-        // Loop over the left out data to compute the LOO chi^2.
-        if (ndata > 0 && nleftout > 0) {
-            // Normalize the depth estimate.
-            d /= w;
+        free(folded);
+    }
 
-            count++;
-            for (i = 0; i < nleftout; i++) {
-                chi = leftout[i] - d;
-                chi2 += chi * chi * loivar[i];
-
-                chi = leftout[i] - 1;
-                chi2 -= chi * chi * loivar[i];
-            }
+    max_ll = -INFINITY;
+    max_phase = 0.0;
+    for (i = 0; i < nphases; ++i) {
+        if (lnlikes[i] > max_ll) {
+            max_ll = lnlikes[i];
+            max_phase = phases[i];
         }
     }
 
-    if (count > 0)
-        return chi2;
-
-    printf("ahhhh %f\n", period);
-    return 0.0;
+    printf("P = %e max(delta lnlike) = %e at t0 = %e\n",
+           period, max_ll, max_phase);
 }
-
-// MEDIANS.
-#define ELEM_SWAP(a,b) { register double t=(a);(a)=(b);(b)=t; }
-double quick_select(double arr[], int n)
-{
-    int low, high;
-    int median;
-    int middle, ll, hh;
-
-    low = 0;
-    high = n-1;
-    median = (low + high) / 2;
-    for (;;) {
-        if (high <= low) /* One element only */
-            return arr[median];
-
-        if (high == low + 1) {  /* Two elements only */
-            if (arr[low] > arr[high])
-                ELEM_SWAP(arr[low], arr[high]);
-            return arr[median];
-        }
-
-        /* Find median of low, middle and high items; swap into position low */
-        middle = (low + high) / 2;
-        if (arr[middle] > arr[high])    ELEM_SWAP(arr[middle], arr[high]) ;
-        if (arr[low] > arr[high])       ELEM_SWAP(arr[low], arr[high]) ;
-        if (arr[middle] > arr[low])     ELEM_SWAP(arr[middle], arr[low]) ;
-
-        /* Swap low item (now in position middle) into position (low+1) */
-        ELEM_SWAP(arr[middle], arr[low+1]) ;
-
-        /* Nibble from each end towards middle, swapping items when stuck */
-        ll = low + 1;
-        hh = high;
-        for (;;) {
-            do ll++; while (arr[low] > arr[ll]) ;
-            do hh--; while (arr[hh]  > arr[low]) ;
-
-            if (hh < ll)
-            break;
-
-            ELEM_SWAP(arr[ll], arr[hh]) ;
-        }
-
-        /* Swap middle item (in position low) back into correct position */
-        ELEM_SWAP(arr[low], arr[hh]) ;
-
-        /* Re-set active partition */
-        if (hh <= median)
-            low = ll;
-            if (hh >= median)
-            high = hh - 1;
-    }
-}
-#undef ELEM_SWAP
