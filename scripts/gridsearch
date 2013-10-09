@@ -8,14 +8,15 @@ __all__ = ["run_grid_search"]
 
 import kplr
 from kplr.ld import get_quad_coeffs
+import bart
+from bart.data import LightCurve
+
 import argparse
 import numpy as np
 import cPickle as pickle
 import matplotlib.pyplot as pl
 
-import bart
-from bart import _grid
-from bart.data import LightCurve
+from turnstile import _grid
 
 parser = argparse.ArgumentParser(
     description="Part of speech tagging.")
