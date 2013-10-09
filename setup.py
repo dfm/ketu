@@ -60,6 +60,7 @@ setup(
     package_dir={"turnstile": "turnstile"},
     include_package_data=True,
     ext_modules=[grid],
+    scripts=["scripts/gridsearch", ],
     install_requires=[
         "bart",
     ],
