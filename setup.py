@@ -61,7 +61,7 @@ setup(
     include_package_data=True,
     ext_modules=[grid],
     install_requires=[
-        "numpy",
+        "bart",
     ],
     classifiers=[
         # "Development Status :: 5 - Production/Stable",
