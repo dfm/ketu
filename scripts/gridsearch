@@ -6,6 +6,9 @@ from __future__ import (division, print_function, absolute_import,
 
 __all__ = ["run_grid_search"]
 
+import os
+import sys
+
 import kplr
 from kplr.ld import get_quad_coeffs
 import bart
@@ -16,7 +19,12 @@ import numpy as np
 import cPickle as pickle
 import matplotlib.pyplot as pl
 
-from turnstile import _grid
+try:
+    from turnstile import _grid
+except ImportError:
+    sys.path.insert(0, os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__))))
+    from turnstile import _grid
 
 parser = argparse.ArgumentParser(
     description="Part of speech tagging.")
