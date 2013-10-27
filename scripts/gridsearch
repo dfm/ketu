@@ -11,12 +11,15 @@ import sys
 
 import kplr
 from kplr.ld import get_quad_coeffs
-import bart
-from bart.data import LightCurve
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__)))), "bart"))
+import bart
+from bart.data import GPLightCurve
+
+import h5py
 import argparse
 import numpy as np
-import cPickle as pickle
 import matplotlib.pyplot as pl
 
 try:
@@ -32,6 +35,8 @@ parser.add_argument("kicid",
                     help="The KIC ID of the star that you want to search.")
 parser.add_argument("periods", nargs=2, type=float,
                     help="The minimum and maximum periods to try.")
+parser.add_argument("-o", "--output", default="search_results",
+                    help="Directory for results.")
 parser.add_argument("--dfreq", default=2e-6, type=float,
                     help="The spacing in the frequency grid.")
 parser.add_argument("--dphase", default=0.3, type=float,
@@ -48,8 +53,14 @@ parser.add_argument("-i", "--inject", default=None, type=float, nargs=2,
 
 
 def run_grid_search(kicid, min_period, max_period, dfreq, dphase, depth,
-                    duration, mask_kois=True, hyperpars=[1e-3, 2.0, 5.2],
-                    inject=None):
+                    duration, mask_kois=True,
+                    hyperpars=[2.443e-5, 0.8531, 50.2],
+                    inject=None, output="search_results"):
+    try:
+        os.makedirs(output)
+    except os.error:
+        print("Directory '{0}' already exists.".format(output))
+
     # Download the data from MAST.
     client = kplr.API()
     star = client.star(kicid)
@@ -108,12 +119,21 @@ def run_grid_search(kicid, min_period, max_period, dfreq, dphase, depth,
             flux *= system.light_curve(time)
 
         # Automatically split the data at gaps.
-        datasets += LightCurve(time, flux, ferr).autosplit()
+        datasets += GPLightCurve(time, flux, ferr, hyperpars) \
+            .autosplit(max_length=300)
 
     # Get rid of datasets with too few points.
     datasets = [d for d in datasets if len(d.time) > 10]
-    print(len(datasets))
-    print([len(d.time) for d in datasets])
+
+    # Optimize the hyperparameters.
+    # print("Setting hyperparameters")
+    # vals = np.empty([0, 3])
+    # for lc in datasets:
+    #     flag, val = lc.optimize_hyperpars(verbose=False)
+    #     if flag == 0:
+    #         vals = np.concatenate((vals, np.atleast_2d(val)))
+    # print(np.median(vals, axis=0))
+    # assert 0
 
     # Plot the injection folded at the right period.
     if inject is not None:
@@ -125,15 +145,24 @@ def run_grid_search(kicid, min_period, max_period, dfreq, dphase, depth,
                  ".")
          for ds in datasets]
         pl.xlim(-2, 2)
-        pl.savefig("data.png")
+        pl.savefig(os.path.join(output, "data.png"))
 
     # Build the period grid.
     periods = 1/np.arange(1/max_period, 1/min_period+dfreq, dfreq)
 
     # Run the grid search.
-    results = _grid.search(datasets, periods, duration, depth * 1e-6,
-                           dphase, hyperpars)
-    pickle.dump((periods, results), open("results.pkl", "wb"), -1)
+    phases, lls = _grid.search(datasets, periods, duration, depth * 1e-6,
+                               dphase, hyperpars)
+    fin_ph = np.nan + np.zeros((len(periods), max([len(p) for p in phases])))
+    fin_ll = np.nan + np.zeros((len(periods), max([len(p) for p in phases])))
+    for i, (p, ll) in enumerate(zip(phases, lls)):
+        fin_ph[i, :len(p)] = p
+        fin_ll[i, :len(ll)] = ll
+
+    with h5py.File(os.path.join(output, "results.h5"), "w") as f:
+        f.create_dataset("periods", data=periods, dtype=np.float64)
+        f.create_dataset("phases", data=fin_ph, dtype=np.float64)
+        f.create_dataset("dlls", data=fin_ll, dtype=np.float64)
 
 
 if __name__ == "__main__":
@@ -141,4 +170,4 @@ if __name__ == "__main__":
     periods = sorted(args.periods)
     run_grid_search(args.kicid, periods[0], periods[1], args.dfreq,
                     args.dphase, args.depth, args.duration, inject=args.inject,
-                    mask_kois=not args.no_mask_kois)
+                    mask_kois=not args.no_mask_kois, output=args.output)
