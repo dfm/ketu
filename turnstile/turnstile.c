@@ -110,15 +110,15 @@ void turnstile_evaluate (double period, int nphases, double *phases,
         free(folded);
     }
 
-    max_ll = -INFINITY;
-    max_phase = 0.0;
-    for (i = 0; i < nphases; ++i) {
-        if (lnlikes[i] > max_ll) {
-            max_ll = lnlikes[i];
-            max_phase = phases[i];
-        }
-    }
+    // max_ll = -INFINITY;
+    // max_phase = 0.0;
+    // for (i = 0; i < nphases; ++i) {
+    //     if (lnlikes[i] > max_ll) {
+    //         max_ll = lnlikes[i];
+    //         max_phase = phases[i];
+    //     }
+    // }
 
-    printf("P = %e max(delta lnlike) = %e at t0 = %e\n",
-           period, max_ll, max_phase);
+    // printf("P = %e max(delta lnlike) = %e at t0 = %e\n",
+    //        period, max_ll, max_phase);
 }

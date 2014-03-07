@@ -61,7 +61,7 @@ static struct module_state _state;
     return NULL;}
 
 static char search_doc[] =
-    "Compute the limb darkened light curve for an approximately Keplerian\n";
+    "Do a freakin' grid search\n";
 
 static PyObject
 *grid_search (PyObject *self, PyObject *args)
