@@ -7,6 +7,7 @@ __all__ = ["Grid"]
 
 import transit
 import numpy as np
+from itertools import izip
 from scipy.spatial import cKDTree
 
 import kplr
@@ -28,13 +29,17 @@ class Grid(object):
         self._data = None
         self.injections = []
 
-    def get_data(self, ttol=0.5, force=False):
+    def get_data(self, ttol=0.5, minpts=50, force=False):
         """
         Get the list of light curve datasets associated with this grid.
 
         :param ttol: (optional)
             The maximum allowed time gap in days. Passed directly to
             :func:`LightCurve.autosplit`. (default: 0.5)
+
+        :param minpts: (optional)
+            The minimum number of data points required to include a dataset.
+            (default: 50)
 
         :param force: (optional)
             If ``True``, force the data to be re-processed even if a cached
@@ -54,6 +59,9 @@ class Grid(object):
             datasets += LightCurve(data["TIME"], data["SAP_FLUX"],
                                    data["SAP_FLUX_ERR"],
                                    data["SAP_QUALITY"] == 0).autosplit(ttol)
+
+        # Remove datasets that are too short.
+        datasets = filter(lambda d: len(d.time) >= minpts, datasets)
 
         # Cache the result.
         self._data = datasets
@@ -86,13 +94,15 @@ class Grid(object):
         a = (_G*period*period*mstar/(4*np.pi*np.pi)) ** (1./3)
 
         # Compute the inclination angle given an impact parameter.
-        ix = np.degrees(np.arctan2(b, a / rstar))
+        ix = np.arctan2(b, a / rstar)
 
         # Inject the transit into the datasets.
-        for lc in self.get_data():
-            lc.flux *= transit.ldlc_kepler(lc.time, u1, u2, mstar, rstar, [0],
-                                           [0], [rp], [a], [t0], [0], [0],
-                                           [ix], [0], texp, tol, maxdepth)
+        for i in range(len(self.get_data())):
+            t = self._data[i].time
+            lc = transit.ldlc_kepler(t, u1, u2, mstar, rstar, [0], [0], [rp],
+                                     [a], [t0], [0], [0], [ix], [0], texp, tol,
+                                     maxdepth)
+            self._data[i].flux *= lc
 
         # Save the injected transit specs.
         self.injections.append(dict(
@@ -115,9 +125,12 @@ class Grid(object):
     def optimize_hyperparams(self, p0=None, N=3):
         pars = []
         for lc in self.get_data():
+            # lc.set_gp_pars([1.5e-8, 0.6])
             pars.append(lc.optimize_hyperparams(p0=p0, N=N))
             print(pars[-1])
-        return pars
+        mu = np.median(pars, axis=0)
+        [lc.set_gp_pars(mu) for lc in self.get_data()]
+        return mu
 
     def compute_hypotheses(self, depths, durations):
         # Make sure that the durations and depths are iterable.
@@ -138,4 +151,18 @@ class Grid(object):
 
         # Build a KDTree index.
         self.index = cKDTree(np.atleast_2d(self.times).T)
+        self.trange = (self.times.min(), self.times.max())
+
+    def evaluate(self, p, t0, tol=0.1):
+        # Compute the times of transits that could possibly be in the dataset.
+        tmn, tmx = self.trange
+        t = t0 % p + p*np.arange(np.floor(tmn / p), np.ceil(tmx / p))
+
+        # Look these up in the index.
+        m = self.index.query(np.atleast_2d(t).T, distance_upper_bound=tol)
+
+        # Sum the log likelihoods.
+        inds = [i for d, i in izip(*m) if d < tol]
+        return np.sum(self.delta_lls[inds], axis=0)
+
 # print(tree.query(np.array([[15.0], [40.0], ]), distance_upper_bound=0.1))
