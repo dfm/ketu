@@ -1,30 +1,34 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from __future__ import (division, print_function, absolute_import,
-                        unicode_literals)
+from __future__ import division, print_function, unicode_literals
 
-__all__ = ["set_basedir", "PipelineElement"]
+__all__ = ["Pipeline"]
 
 import os
+import json
+import hashlib
 import cPickle as pickle
 
 VERSION = "0.0"
 
 
-def set_basedir(path):
-    global basedir
-    basedir = path
-basedir = os.path.expanduser(os.path.join("~", ".turnstile"))
+basedir = os.path.abspath(os.path.expanduser(os.environ.get("TURNSTILE_PATH",
+                                                            "~/.turnstile")))
 
 
-class PipelineElement(object):
+class Pipeline(object):
 
     element_name = None
+    defaults = {}
 
-    def __init__(self):
+    def __init__(self, parent=None, **kwargs):
+        self.defaults = dict(self.defaults, **kwargs)
+        self.parent = parent
         if self.element_name is None:
             self.element_name = self.__class__.__name__
+
+    def get_arg(self, k, kwargs):
+        return kwargs.pop(k, self.defaults.get(k))
 
     @property
     def cachedir(self):
@@ -34,33 +38,33 @@ class PipelineElement(object):
         return os.path.join(self.cachedir, key + ".pkl")
 
     def get_key(self, **kwargs):
-        raise NotImplementedError()
+        k = None if self.parent is None else self.parent.element_name
+        return hashlib.sha1(json.dumps([k, dict(self.defaults, **kwargs)],
+                                       sort_keys=True)).hexdigest()
 
-    def get(self, **kwargs):
-        raise NotImplementedError()
+    def query(self, **kwargs):
+        clobber = kwargs.get("clobber", False)
 
-    def __getitem__(self, key):
+        # Check if this request is already cached.
+        key = self.get_key(**kwargs)
         fn = self.get_cache_filename(key)
-        if os.path.exists(fn):
+        if not clobber and os.path.exists(fn):
+            print("Using cached value in {0}".format(self.element_name))
             with open(fn, "rb") as f:
                 return pickle.load(f)
-        return None
 
-    def __setitem__(self, key, value):
-        fn = self.get_cache_filename(key)
+        # If we get here then the result isn't yet cached. Let's compute it
+        # now.
+        result = self.get_result(**kwargs)
+
+        # Save the results to the cache.
         try:
-            os.makedirs(os.path.split(os.path.abspath(fn))[0])
+            os.makedirs(os.path.dirname(fn))
         except os.error:
             pass
         with open(fn, "wb") as f:
-            pickle.dump(value, f, -1)
+            pickle.dump(result, f, -1)
+        return result
 
-    def call(self, **kwargs):
-        k = self.get_key(**kwargs)
-        val = self[k]
-        if val is not None:
-            return val
-
-        val = self.get(**kwargs)
-        self[k] = val
-        return val
+    def get_result(self, **kwargs):
+        raise NotImplementedError("Subclasses should implement this method")
