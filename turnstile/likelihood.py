@@ -42,7 +42,7 @@ class GPLCWrapper(LCWrapper):
         # Estimate the hyperparameters.
         var = float(np.var(lc.flux))
         scale = np.median(np.diff(lc.time)) * integrated_time(lc.flux)
-        self.gp = george.GP(var * ExpSquaredKernel(scale))
+        self.gp = george.GP(var * ExpSquaredKernel(scale ** 2))
         self.gp.compute(lc.time, lc.ferr)
 
     def lnlike(self, model):

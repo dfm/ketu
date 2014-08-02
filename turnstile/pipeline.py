@@ -18,7 +18,8 @@ class Pipeline(object):
     element_name = None
     defaults = {}
 
-    def __init__(self, parent=None, **kwargs):
+    def __init__(self, parent=None, clobber=False, **kwargs):
+        self.clobber = clobber
         self.defaults = dict(self.defaults, **kwargs)
         self.parent = parent
         if self.element_name is None:
@@ -51,12 +52,10 @@ class Pipeline(object):
                                        sort_keys=True)).hexdigest()
 
     def query(self, **kwargs):
-        clobber = kwargs.get("clobber", False)
-
         # Check if this request is already cached.
         key = self.get_key(**kwargs)
         fn = self.get_cache_filename(key)
-        if not clobber and os.path.exists(fn):
+        if not self.clobber and os.path.exists(fn):
             print("Using cached value in {0}".format(self.element_name))
             with open(fn, "rb") as f:
                 return pickle.load(f)

@@ -5,7 +5,6 @@ from __future__ import division, print_function, unicode_literals
 __all__ = ["Hypotheses"]
 
 import numpy as np
-from scipy.spatial import cKDTree
 
 from .pipeline import Pipeline
 from ._compute import compute_hypotheses

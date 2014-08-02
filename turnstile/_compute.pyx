@@ -79,13 +79,19 @@ def grid_search(np.ndarray[DTYPE_t, ndim=1] times,
     cdef unsigned int nt
     cdef unsigned int ntmx = int(ceil(periods.max() / dt))
 
-    cdef np.ndarray[DTYPE_t, ndim=4] results = np.zeros((nperiods,
-                                                         ntmx,
-                                                         a, b), dtype=DTYPE)
+    cdef np.ndarray[DTYPE_t, ndim=4] results = np.nan + np.zeros((nperiods,
+                                                                   ntmx,
+                                                                   a, b),
+                                                                   dtype=DTYPE)
     for i in range(nperiods):
         period = periods[i]
         t0 = 0.0
         for j in range(ntmx):
+            # Initialize the results array at zero.
+            for k in range(a):
+                for l in range(b):
+                    results[i, j, k, l] = 0.0
+
             # Loop over transit times for this given period and phase.
             ind, strt = 0, 0
 

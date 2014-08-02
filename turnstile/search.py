@@ -23,10 +23,13 @@ class Search(Pipeline):
 
         # Run the grid search.
         times = result.pop("times")
+        mu = np.mean(times)
+        times -= mu
         grid = grid_search(times, result.pop("dll"), np.atleast_1d(periods),
                            dt, times.min(), times.max(), tol)
 
         # Save and return the results.
+        result["mean_time"] = mu
         result["periods"] = periods
         result["grid"] = grid
         result["dt"] = dt
