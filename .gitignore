@@ -10,3 +10,4 @@ turnstile/_bls*
 .syntastic_c_config
 dist
 *.egg-info
+*.c

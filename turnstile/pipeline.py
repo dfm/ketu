@@ -9,9 +9,6 @@ import json
 import hashlib
 import cPickle as pickle
 
-VERSION = "0.0"
-
-
 basedir = os.path.abspath(os.path.expanduser(os.environ.get("TURNSTILE_PATH",
                                                             "~/.turnstile")))
 
@@ -28,18 +25,29 @@ class Pipeline(object):
             self.element_name = self.__class__.__name__
 
     def get_arg(self, k, kwargs):
-        return kwargs.pop(k, self.defaults.get(k))
+        if k in kwargs:
+            return kwargs.pop(k)
+        if k in self.defaults:
+            return self.defaults[k]
+        raise RuntimeError("Missing required argument {0}".format(k))
 
     @property
     def cachedir(self):
-        return os.path.join(basedir, VERSION, self.element_name)
+        from . import __version__
+        return os.path.join(basedir, __version__, self.element_name)
 
     def get_cache_filename(self, key):
         return os.path.join(self.cachedir, key + ".pkl")
 
+    def get_id(self):
+        k = self.element_name
+        if self.parent is not None:
+            k += " < " + self.parent.get_id()
+        return k
+
     def get_key(self, **kwargs):
-        k = None if self.parent is None else self.parent.element_name
-        return hashlib.sha1(json.dumps([k, dict(self.defaults, **kwargs)],
+        return hashlib.sha1(json.dumps([self.get_id(),
+                                        dict(self.defaults, **kwargs)],
                                        sort_keys=True)).hexdigest()
 
     def query(self, **kwargs):
@@ -55,7 +63,9 @@ class Pipeline(object):
 
         # If we get here then the result isn't yet cached. Let's compute it
         # now.
+        print("Querying {0}".format(self.element_name))
         result = self.get_result(**kwargs)
+        print("Finished querying {0}".format(self.element_name))
 
         # Save the results to the cache.
         try:
