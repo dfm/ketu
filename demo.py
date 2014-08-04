@@ -13,11 +13,15 @@ dfreq = 0.005 / (4.25 * 365.)
 freq = np.arange(1.0 / 150., 1.0 / 50., dfreq)
 periods = 1.0 / freq
 print("Testing {0} periods".format(len(periods)))
+durations = np.arange(0.2, 0.9, 0.1)
+print("Testing {0} durations".format(len(durations)))
+depths = np.arange(0.01, 0.07, 0.01) ** 2
+print("Testing {0} depths".format(len(durations)))
 
 q = dict(
     kicid=12253474,
     injections=[dict(period=114.0, t0=22., radius=r)],
-    durations=0.35, depths=r**2,
+    durations=durations.tolist(), depths=depths.tolist(),
     periods=periods.tolist(), dt=0.1,
 )
 

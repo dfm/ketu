@@ -5,6 +5,7 @@ from __future__ import division, print_function, unicode_literals
 __all__ = ["Pipeline"]
 
 import os
+import gzip
 import json
 import hashlib
 import cPickle as pickle
@@ -38,7 +39,7 @@ class Pipeline(object):
         return os.path.join(basedir, __version__, self.element_name)
 
     def get_cache_filename(self, key):
-        return os.path.join(self.cachedir, key + ".pkl")
+        return os.path.join(self.cachedir, key + ".pkl.gz")
 
     def get_id(self):
         k = self.element_name
@@ -57,7 +58,7 @@ class Pipeline(object):
         fn = self.get_cache_filename(key)
         if not self.clobber and os.path.exists(fn):
             print("Using cached value in {0}".format(self.element_name))
-            with open(fn, "rb") as f:
+            with gzip.open(fn, "rb") as f:
                 return pickle.load(f)
 
         # If we get here then the result isn't yet cached. Let's compute it
@@ -71,7 +72,7 @@ class Pipeline(object):
             os.makedirs(os.path.dirname(fn))
         except os.error:
             pass
-        with open(fn, "wb") as f:
+        with gzip.open(fn, "wb") as f:
             pickle.dump(result, f, -1)
         return result
 
