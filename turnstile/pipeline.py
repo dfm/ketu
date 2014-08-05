@@ -7,6 +7,7 @@ __all__ = ["Pipeline"]
 import os
 import gzip
 import json
+import time
 import hashlib
 import cPickle as pickle
 
@@ -64,8 +65,11 @@ class Pipeline(object):
         # If we get here then the result isn't yet cached. Let's compute it
         # now.
         print("Querying {0}".format(self.element_name))
+        strt = time.time()
         result = self.get_result(**kwargs)
-        print("Finished querying {0}".format(self.element_name))
+        dt = (time.time() - strt) * 1000
+        print("Finished querying {0} in {1:.2f}ms".format(self.element_name,
+                                                          dt))
 
         # Save the results to the cache.
         try:

@@ -8,8 +8,8 @@ import matplotlib.pyplot as pl
 
 import turnstile
 
-r = 0.012
-pmin, pmax = 350., 400.
+r = 0.04
+pmin, pmax = 110, 115.
 periods = np.exp(np.arange(np.log(pmin), np.log(pmax), 0.3*0.3/(4.1*365.)))
 print("Testing {0} periods".format(len(periods)))
 durations = np.array([0.3])  # np.arange(0.3, 0.7, 0.2)
@@ -19,7 +19,7 @@ print("Testing {0} depths".format(len(durations)))
 
 q1 = dict(
     kicid=12253474,
-    injections=[dict(period=365.25, t0=118.34, radius=r)],
+    injections=[dict(period=114.123, t0=12.5, radius=r)],
 )
 q2 = dict(
     durations=durations.tolist(), depths=depths.tolist(),

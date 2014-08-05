@@ -1,7 +1,7 @@
 from __future__ import division
 
 cimport cython
-from libc.math cimport fabs, fmod, floor, ceil
+from libc.math cimport fabs, fmod, floor, ceil, round
 
 import numpy as np
 cimport numpy as np
@@ -41,7 +41,7 @@ def compute_hypotheses(lnlikefn, double ll0, np.ndarray[DTYPE_t, ndim=1] t,
             model.depth = depths[j]
             for k in range(ndurations):
                 model.half_duration = 0.5 * durations[k]
-                results[i, j, k] = lnlikefn(model) - ll0
+                results[i, j, k] += lnlikefn(model) - ll0
 
 
 @cython.boundscheck(False)
@@ -64,11 +64,10 @@ cdef int look_up_time(unsigned int strt, double t0,
 
 
 @cython.boundscheck(False)
-def grid_search(np.ndarray[DTYPE_t, ndim=1] times,
+def grid_search(double tmin, double tmax, double time_spacing,
                 np.ndarray[DTYPE_t, ndim=3] dll,
                 np.ndarray[DTYPE_t, ndim=1] periods,
-                double dt, double tmin, double tmax,
-                double tol):
+                double dt):
     cdef double t0, t, period
     cdef unsigned int i, j, k, l, strt, n
     cdef int ind
@@ -80,9 +79,9 @@ def grid_search(np.ndarray[DTYPE_t, ndim=1] times,
     cdef unsigned int ntmx = int(ceil(periods.max() / dt))
 
     cdef np.ndarray[DTYPE_t, ndim=4] results = np.nan + np.zeros((nperiods,
-                                                                   ntmx,
-                                                                   a, b),
-                                                                   dtype=DTYPE)
+                                                                  ntmx,
+                                                                  a, b),
+                                                                  dtype=DTYPE)
     for i in range(nperiods):
         period = periods[i]
         t0 = 0.0
@@ -96,15 +95,12 @@ def grid_search(np.ndarray[DTYPE_t, ndim=1] times,
             ind, strt = 0, 0
 
             t = fmod(t0, period) + period * floor(tmin / period)
-            nt = int(ceil((tmax - tmin) / period))
-            for n in range(nt):
-                ind = look_up_time(strt, t, times, tol)
+            while t < tmax:
+                ind = int(round((t - tmin) / time_spacing))
+                for k in range(a):
+                    for l in range(b):
+                        results[i, j, k, l] += dll[ind, k, l]
                 t += period
-                if ind > 0:
-                    strt = ind
-                    for k in range(a):
-                        for l in range(b):
-                            results[i, j, k, l] += dll[ind, k, l]
 
             # Update the proposal time.
             t0 += dt

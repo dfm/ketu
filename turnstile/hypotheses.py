@@ -12,37 +12,44 @@ from ._compute import compute_hypotheses
 
 class Hypotheses(Pipeline):
 
+    defaults = dict(
+        time_spacing=0.02,
+    )
+
     def get_result(self, **kwargs):
         # Parse the input parameters.
         durations = np.atleast_1d(self.get_arg("durations", kwargs))
         depths = np.atleast_1d(self.get_arg("depths", kwargs))
+        dt = np.atleast_1d(self.get_arg("time_spacing", kwargs))
 
         # Get the processed light curves.
         result = self.parent.query(**kwargs)
         lcs = result.pop("data")
 
-        # Count the total number of hypotheses required.
-        ntot = sum((len(lc.time) for lc in lcs))
-
         # Pre-allocate the results arrays.
-        times = np.empty(ntot)
-        grid = np.empty((ntot, len(depths), len(durations)))
+        times = np.concatenate([lc.time for lc in lcs])
+        times = np.arange(times.min(), times.max(), dt)
+        grid = np.zeros((len(times), len(depths), len(durations)))
 
         # Loop over the light curves and compute the model for each one.
-        i = 0
         for lc in lcs:
             # Compute the "null" hypothesis likelihood (no transit).
             ll0 = lc.lnlike(lambda t: np.ones_like(t))
-            l = len(lc.time)
-            compute_hypotheses(lc.lnlike, ll0, lc.time, depths, durations,
-                               grid[i:i+l])
-            times[i:i+l] = lc.time
-            i += l
+
+            # Find the times that are in this light curve.
+            m = (lc.time.min() <= times) * (times <= lc.time.max())
+            if not np.any(m):
+                continue
+
+            # Compute the grid of hypotheses.
+            i = np.arange(len(times))[m]
+            compute_hypotheses(lc.lnlike, ll0, times[i.min():i.max()],
+                               depths, durations, grid[i.min():i.max()])
 
         # Build a KDTree index.
-        i = np.argsort(times)
-        result["times"] = times[i]
-        result["dll"] = grid[i]
+        result["times"] = times
+        result["time_spacing"] = dt
+        result["dll"] = grid
         result["rng"] = (times.min(), times.max())
         result["depths"] = depths
         result["durations"] = durations
