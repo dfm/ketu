@@ -8,8 +8,10 @@ import os
 import gzip
 import json
 import time
+import shutil
 import hashlib
 import cPickle as pickle
+from tempfile import NamedTemporaryFile
 
 basedir = os.path.abspath(os.path.expanduser(os.environ.get("TURNSTILE_PATH",
                                                             "~/.turnstile")))
@@ -76,8 +78,18 @@ class Pipeline(object):
             os.makedirs(os.path.dirname(fn))
         except os.error:
             pass
-        with gzip.open(fn, "wb") as f:
-            pickle.dump(result, f, -1)
+
+        # Atomically write to disk.
+        # http://stackoverflow.com/questions/2333872/ \
+        #        atomic-writing-to-file-with-python
+        f = NamedTemporaryFile("wb", dir=self.cachedir, delete=False)
+        gzf = gzip.GzipFile(fileobj=f)
+        pickle.dump(result, gzf, -1)
+        f.flush()
+        os.fsync(f.fileno())
+        f.close()
+        shutil.move(f.name, fn)
+
         return result
 
     def get_result(self, **kwargs):
