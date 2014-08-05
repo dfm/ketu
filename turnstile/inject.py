@@ -27,11 +27,25 @@ class InjectedLightCurve(object):
 
 class Inject(Pipeline):
 
-    defaults = dict(b=0.0, e=0.0, pomega=0.0, injections=[])
+    defaults = dict(
+        q1=0.5,
+        q2=0.5,
+        mstar=1.0,
+        rstar=1.0,
+        b=0.0,
+        e=0.0,
+        pomega=0.0,
+        injections=[]
+    )
 
     def get_result(self, **kwargs):
         # Build the system.
-        s = transit.System(transit.Central())
+        q1 = self.get_arg("q1", kwargs)
+        q2 = self.get_arg("q2", kwargs)
+        mstar = self.get_arg("mstar", kwargs)
+        rstar = self.get_arg("rstar", kwargs)
+        s = transit.System(transit.Central(q1=q1, q2=q2, mass=mstar,
+                                           radius=rstar))
 
         # Parse the arguments.
         injections = self.get_arg("injections", kwargs)
