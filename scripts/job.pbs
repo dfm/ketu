@@ -1,0 +1,30 @@
+#!/bin/bash
+#PBS -l nodes=4:ppn=12
+#PBS -l walltime=48:00:00
+#PBS -l mem=48GB
+#PBS -N turnstile
+#PBS -M danfm@nyu.edu
+#PBS -j oe
+ 
+module purge
+export PATH="$HOME/miniconda/bin:$PATH"
+
+# Needed environment variables.
+export KPLR_ROOT=$SCRATCH/kplr
+export TURNSTILE_PATH=$SCRATCH/turnstile/cache
+
+# Locations.
+SRCDIR=$HOME/projects/turnstile
+RUNDIR=$SCRATCH/turnstile/run-${PBS_JOBID/.*}
+mkdir -p $RUNDIR
+cd $RUNDIR
+
+# Set up and start the IPython cluster.
+cp -r $HOME/.ipython/profile_mpi profile
+ipcluster start -n $PBS_NP --profile-dir=./profile
+
+# Run the analysis.
+python $SRCDIR/scripts/injections.py &> output.log
+
+# Shut the cluster down.
+ipcluster stop  --profile-dir=./profile

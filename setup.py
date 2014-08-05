@@ -36,7 +36,7 @@ setup(
     version=turnstile.__version__,
     author="Daniel Foreman-Mackey",
     author_email="danfm@nyu.edu",
-    packages=["turnstile", "turnstile.hypothesis"],
+    packages=["turnstile"],
     ext_modules=cythonize([ext]),
     url="http://github.com/dfm/turnstile",
     license="MIT",
