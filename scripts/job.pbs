@@ -16,15 +16,16 @@ export TURNSTILE_PATH=$SCRATCH/turnstile/cache
 # Locations.
 SRCDIR=$HOME/projects/turnstile
 RUNDIR=$SCRATCH/turnstile/run-${PBS_JOBID/.*}
+PROFILEDIR=$RUNDIR/profile
 mkdir -p $RUNDIR
 cd $RUNDIR
 
 # Set up and start the IPython cluster.
-cp -r $HOME/.ipython/profile_mpi profile
-ipcluster start -n $PBS_NP --profile-dir=./profile
+cp -r $HOME/.ipython/profile_mpi $PROFILEDIR
+ipcluster start -n $PBS_NP --profile-dir=$PROFILEDIR
 
 # Run the analysis.
-python $SRCDIR/scripts/injections.py &> output.log
+python $SRCDIR/scripts/injections.py $PROFILEDIR &> output.log
 
 # Shut the cluster down.
-ipcluster stop  --profile-dir=./profile
+ipcluster stop  --profile-dir=$PROFILEDIR
