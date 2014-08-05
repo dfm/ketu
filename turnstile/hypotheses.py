@@ -13,7 +13,7 @@ from ._compute import compute_hypotheses
 class Hypotheses(Pipeline):
 
     defaults = dict(
-        time_spacing=0.02,
+        time_spacing=0.05,
     )
 
     def get_result(self, **kwargs):

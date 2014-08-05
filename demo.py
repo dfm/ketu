@@ -8,8 +8,8 @@ import matplotlib.pyplot as pl
 
 import turnstile
 
-r = 0.04
-pmin, pmax = 110, 115.
+r = 0.02
+pmin, pmax = 100, 400.
 periods = np.exp(np.arange(np.log(pmin), np.log(pmax), 0.3*0.3/(4.1*365.)))
 print("Testing {0} periods".format(len(periods)))
 durations = np.array([0.3])  # np.arange(0.3, 0.7, 0.2)

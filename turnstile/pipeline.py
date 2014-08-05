@@ -67,9 +67,9 @@ class Pipeline(object):
         print("Querying {0}".format(self.element_name))
         strt = time.time()
         result = self.get_result(**kwargs)
-        dt = (time.time() - strt) * 1000
-        print("Finished querying {0} in {1:.2f}ms".format(self.element_name,
-                                                          dt))
+        dt = time.time() - strt
+        print("Finished querying {0} in {1:.2f}s".format(self.element_name,
+                                                         dt))
 
         # Save the results to the cache.
         try:

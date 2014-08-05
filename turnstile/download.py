@@ -20,6 +20,7 @@ class Download(Pipeline):
         # Connect to the API.
         client = kplr.API()
         kic = client.star(kicid)
+        kic.kois
 
         # Download the light curves.
         short_cadence = self.get_arg("short_cadence", kwargs)
