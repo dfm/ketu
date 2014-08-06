@@ -6,11 +6,12 @@ from __future__ import division, print_function
 import os
 import json
 import gzip
+import time
 import fitsio
 import numpy as np
-import cPickle as pickle
+import cPickle
 from scipy.stats import beta
-from IPython.parallel import Client
+from IPython.parallel import Client, require
 
 import turnstile
 
@@ -48,6 +49,7 @@ def generate_system(K, mstar=1.0, rstar=1.0):
                             for _ in zip(periods, t0s, radii, b, e, pomega)])
 
 
+@require(os, json, cPickle, gzip)
 def run_query(args):
     # Parse the input arguments.
     pipe, q = args
@@ -69,7 +71,7 @@ def run_query(args):
     # Save the output.
     fn = os.path.join(dirname, "results.pkl.gz")
     with gzip.open(fn, "wb") as f:
-        pickle.dump(results, f, -1)
+        cPickle.dump(results, f, -1)
 
     return fn
 
@@ -113,7 +115,10 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("N", type=int,
-                        help="the number of simulations to run")
+                        help="the number of simulations to run "
+                             "(per iteration)")
+    parser.add_argument("-i", "--iterations", default=1, type=int,
+                        help="the number of iterations to run")
     parser.add_argument("-p", "--profile-dir", default=None,
                         help="the IPython profile dir")
     parser.add_argument("-s", "--seed", default=None, type=int,
@@ -123,4 +128,7 @@ if __name__ == "__main__":
     if args.seed is not None:
         np.random.seed(args.seed)
 
-    print("\n".join(main(args.N, profile_dir=args.profile_dir)))
+    for i in range(args.iterations):
+        strt = time.time()
+        main(args.N, profile_dir=args.profile_dir)
+        print("Iteration {0} took {1:.2f}s".format(i+1, time.time()-strt))

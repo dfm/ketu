@@ -1,8 +1,9 @@
 #!/bin/bash
-#PBS -l nodes=4:ppn=12
+#PBS -l nodes=2:ppn=12
 #PBS -l walltime=12:00:00
 #PBS -l mem=96GB
 #PBS -N turnstile
+#PBS -m ae
 #PBS -M danfm@nyu.edu
 #PBS -j oe
  
@@ -10,7 +11,7 @@ module purge
 export PATH="$HOME/miniconda/bin:$PATH"
 
 # Needed environment variables.
-export KPLR_ROOT=$SCRATCH/kplr
+export KPLR_DATA_DIR=$SCRATCH/kplr
 export TURNSTILE_PATH=$SCRATCH/turnstile/cache
 
 # Locations.
@@ -22,10 +23,24 @@ cd $RUNDIR
 
 # Set up and start the IPython cluster.
 cp -r $HOME/.ipython/profile_mpi $PROFILEDIR
-ipcluster start -n $PBS_NP --profile-dir=$PROFILEDIR
+ipcluster start -n $PBS_NP --profile-dir=$PROFILEDIR &> ipcluster.log &
 
-# Run the analysis.
-python $SRCDIR/scripts/injections.py $PBS_NP --profile-dir $PROFILEDIR &> output.log
+for (( try=0; try < 10; ++try )); do
+    if cat ipcluster.log | grep -q "Engines appear to have started successfully"; then
+        success=1
+        break
+    fi
+    sleep 5
+done
+
+if (( success )); then
+    # Run the analysis.
+    python $SRCDIR/scripts/injections.py $PBS_NP --iterations 10 --profile-dir $PROFILEDIR &> output.log
+else
+    echo "Server never started!" &> output.log
+fi
 
 # Shut the cluster down.
 ipcluster stop  --profile-dir=$PROFILEDIR
+
+exit $(( 1-success ));

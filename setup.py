@@ -32,7 +32,7 @@ import turnstile
 # Execute the setup command.
 desc = open("README.rst").read()
 setup(
-    name="transit",
+    name="turnstile",
     version=turnstile.__version__,
     author="Daniel Foreman-Mackey",
     author_email="danfm@nyu.edu",
