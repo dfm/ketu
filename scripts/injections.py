@@ -37,7 +37,7 @@ def generate_system(K, mstar=1.0, rstar=1.0):
 
     periods = np.exp(np.random.uniform(np.log(50), np.log(450), K))
     t0s = np.array([np.random.uniform(0, p) for p in periods])
-    radii = np.exp(np.random.uniform(np.log(0.005), np.log(0.03), K))
+    radii = np.exp(np.random.uniform(np.log(0.005), np.log(0.04), K))
     b = np.random.uniform(0, 1, K)
     e = beta.rvs(0.867, 3.03, size=K)
     pomega = np.random.uniform(0, 2*np.pi, K)
@@ -85,7 +85,7 @@ def main(N, profile_dir=None):
     base_query = dict(
         durations=duration, depths=depths,
         periods=periods.tolist(), dt=0.2 * duration,
-        time_spacing=0.04,
+        time_spacing=0.05,
     )
 
     # Load the stellar dataset.
@@ -97,7 +97,7 @@ def main(N, profile_dir=None):
     # Generate N queries for the pipeline with injections in each one.
     queries = []
     for i in np.random.randint(len(stars), size=N):
-        q = generate_system(np.random.poisson(5),
+        q = generate_system(np.random.poisson(7),
                             mstar=stars[i]["mstar"],
                             rstar=stars[i]["rstar"])
         q["kicid"] = stars[i]["kic"]
