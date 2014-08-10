@@ -74,8 +74,10 @@ class Pipeline(object):
         # Save the results to the cache.
         try:
             os.makedirs(os.path.dirname(fn))
-        except os.error:
+        except os.error as e:
+            print(e)
             pass
+        print(fn)
         with gzip.open(fn, "wb") as f:
             pickle.dump(result, f, -1)
 

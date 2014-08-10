@@ -37,7 +37,7 @@ def generate_system(K, mstar=1.0, rstar=1.0):
 
     periods = np.exp(np.random.uniform(np.log(50), np.log(450), K))
     t0s = np.array([np.random.uniform(0, p) for p in periods])
-    radii = np.exp(np.random.uniform(np.log(0.005), np.log(0.04), K))
+    radii = np.random.uniform(0.005, 0.04, K)
     b = np.random.uniform(0, 1, K)
     e = beta.rvs(0.867, 3.03, size=K)
     pomega = np.random.uniform(0, 2*np.pi, K)
