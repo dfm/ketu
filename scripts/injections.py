@@ -37,7 +37,7 @@ def generate_system(K, mstar=1.0, rstar=1.0):
 
     periods = np.exp(np.random.uniform(np.log(50), np.log(450), K))
     t0s = np.array([np.random.uniform(0, p) for p in periods])
-    radii = np.exp(np.random.uniform(np.log(0.005), np.log(0.02), K))
+    radii = np.exp(np.random.uniform(np.log(0.005), np.log(0.03), K))
     b = np.random.uniform(0, 1, K)
     e = beta.rvs(0.867, 3.03, size=K)
     pomega = np.random.uniform(0, 2*np.pi, K)
@@ -78,14 +78,14 @@ def run_query(args):
 
 def main(N, profile_dir=None):
     # Choose some search parameters. There be a lot of MAGIC here.
-    duration, depths = 0.4, [0.005**2, 0.01**2, 0.02**2]
+    duration, depths = 0.3, [0.005**2, 0.01**2, 0.02**2]
     pmin, pmax = 100, 400
     periods = np.exp(np.arange(np.log(pmin), np.log(pmax),
                                0.3*duration/(4.1*365.)))
     base_query = dict(
         durations=duration, depths=depths,
-        periods=periods.tolist(), dt=0.3 * duration,
-        time_spacing=0.05,
+        periods=periods.tolist(), dt=0.2 * duration,
+        time_spacing=0.04,
     )
 
     # Load the stellar dataset.
