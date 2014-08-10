@@ -20,7 +20,8 @@ class Pipeline(object):
     element_name = None
     defaults = {}
 
-    def __init__(self, parent=None, clobber=False, **kwargs):
+    def __init__(self, parent=None, clobber=False, cache=True, **kwargs):
+        self.cache = cache
         self.clobber = clobber
         self.defaults = dict(self.defaults, **kwargs)
         self.parent = parent
@@ -57,7 +58,7 @@ class Pipeline(object):
         # Check if this request is already cached.
         key = self.get_key(**kwargs)
         fn = self.get_cache_filename(key)
-        if not self.clobber and os.path.exists(fn):
+        if self.cache and not self.clobber and os.path.exists(fn):
             print("Using cached value in {0}".format(self.element_name))
             with gzip.open(fn, "rb") as f:
                 return pickle.load(f)
@@ -72,14 +73,13 @@ class Pipeline(object):
                                                          dt))
 
         # Save the results to the cache.
-        try:
-            os.makedirs(os.path.dirname(fn))
-        except os.error as e:
-            print(e)
-            pass
-        print(fn)
-        with gzip.open(fn, "wb") as f:
-            pickle.dump(result, f, -1)
+        if self.cache:
+            try:
+                os.makedirs(os.path.dirname(fn))
+            except os.error:
+                pass
+            with gzip.open(fn, "wb") as f:
+                pickle.dump(result, f, -1)
 
         return result
 

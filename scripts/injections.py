@@ -16,13 +16,13 @@ from IPython.parallel import Client, require
 import turnstile
 
 
-def setup_pipeline():
-    pipe = turnstile.Download()
-    pipe = turnstile.Inject(pipe)
-    pipe = turnstile.Prepare(pipe)
-    pipe = turnstile.GPLikelihood(pipe)
-    pipe = turnstile.Hypotheses(pipe)
-    pipe = turnstile.Search(pipe)
+def setup_pipeline(cache=False):
+    pipe = turnstile.Download(cache=cache)
+    pipe = turnstile.Inject(pipe, cache=cache)
+    pipe = turnstile.Prepare(pipe, cache=cache)
+    pipe = turnstile.GPLikelihood(pipe, cache=cache)
+    pipe = turnstile.Hypotheses(pipe, cache=cache)
+    pipe = turnstile.Search(pipe, cache=cache)
     return pipe
 
 
