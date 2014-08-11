@@ -11,3 +11,5 @@ turnstile/_bls*
 dist
 *.egg-info
 *.c
+build
+scripts/turnstile.o*

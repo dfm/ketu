@@ -4,23 +4,27 @@
 from __future__ import division, print_function
 
 import os
+import h5py
 import json
 import gzip
-import time
 import fitsio
-import numpy as np
 import cPickle
+import numpy as np
 from scipy.stats import beta
 from IPython.parallel import Client, require
 
 import turnstile
 
 
-def setup_pipeline(cache=False):
+def setup_pipeline(cache=False, gp=True):
     pipe = turnstile.Download(cache=cache)
     pipe = turnstile.Inject(pipe, cache=cache)
     pipe = turnstile.Prepare(pipe, cache=cache)
-    pipe = turnstile.GPLikelihood(pipe, cache=cache)
+    if gp:
+        pipe = turnstile.GPLikelihood(pipe, cache=cache)
+    else:
+        pipe = turnstile.Detrend(pipe, cache=cache)
+        pipe = turnstile.BasicLikelihood(pipe, cache=cache)
     pipe = turnstile.Hypotheses(pipe, cache=cache)
     pipe = turnstile.Search(pipe, cache=cache)
     return pipe
@@ -49,7 +53,7 @@ def generate_system(K, mstar=1.0, rstar=1.0):
                             for _ in zip(periods, t0s, radii, b, e, pomega)])
 
 
-@require(os, json, cPickle, gzip)
+@require(os, json, cPickle, h5py, gzip)
 def run_query(args):
     # Parse the input arguments.
     pipe, q = args
@@ -66,7 +70,20 @@ def run_query(args):
         json.dump(q, f, indent=2, sort_keys=True)
 
     # Run the query.
-    results = pipe.query(**q)
+    try:
+        results = pipe.query(**q)
+    except Exception as e:
+        with open(os.path.join(dirname, "error.txt"), "w") as f:
+            f.write("Failed with exception:\n{0}".format(e))
+        return None
+
+    # Pull out the big objects.
+    grid = results.pop("grid")
+    periods = results.pop("periods")
+    fn = os.path.join(dirname, "results.h5")
+    with h5py.File(fn, "w") as f:
+        f.create_dataset("periods", data=periods)
+        f.create_dataset("grid", data=grid)
 
     # Save the output.
     fn = os.path.join(dirname, "results.pkl.gz")
@@ -76,7 +93,7 @@ def run_query(args):
     return fn
 
 
-def main(N, profile_dir=None):
+def build_queries(N, gp=True):
     # Choose some search parameters. There be a lot of MAGIC here.
     duration, depths = 0.3, [0.005**2, 0.01**2, 0.02**2]
     pmin, pmax = 100, 400
@@ -92,7 +109,7 @@ def main(N, profile_dir=None):
     stars = load_stars()
 
     # Set up the pipeline.
-    pipe = setup_pipeline()
+    pipe = setup_pipeline(gp=gp)
 
     # Generate N queries for the pipeline with injections in each one.
     queries = []
@@ -103,9 +120,17 @@ def main(N, profile_dir=None):
         q["kicid"] = stars[i]["kic"]
         queries.append((pipe, dict(base_query, **q)))
 
+    return queries
+
+
+def main(N, profile_dir=None, gp=True):
+    queries = build_queries(N, gp=gp)
+    print("Submitting {0} / {1} queries".format(len(queries), N))
+
     # Set up the interface to the cluster.
     c = Client(profile_dir=profile_dir)
-    pool = c[:]
+    pool = c.load_balanced_view()
+
     results = pool.map(run_query, queries)
     return [r for r in results]
 
@@ -125,10 +150,10 @@ if __name__ == "__main__":
                         help="the random number seed")
     args = parser.parse_args()
 
+    print("Running with the following arguments:")
+    print(args)
+
     if args.seed is not None:
         np.random.seed(args.seed)
 
-    for i in range(args.iterations):
-        strt = time.time()
-        main(args.N, profile_dir=args.profile_dir)
-        print("Iteration {0} took {1:.2f}s".format(i+1, time.time()-strt))
+    main(args.N * args.iterations, profile_dir=args.profile_dir)
