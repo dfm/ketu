@@ -4,22 +4,22 @@
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
-__all__ = []
+__all__ = ["main"]
 
 import os
 import h5py
 import fitsio
 import turnstile
 import numpy as np
-from itertools import izip
 from scipy.stats import beta
 from multiprocessing import Pool
+from itertools import izip, ifilter
 
 
-def setup_pipeline(cache=True):
+def setup_pipeline(cache=False):
     pipe = turnstile.Download(cache=cache)
-    pipe = turnstile.Inject(pipe, cache=cache)
-    pipe = turnstile.Prepare(pipe, cache=cache)
+    pipe = turnstile.Inject(pipe, cache=False)
+    pipe = turnstile.Prepare(pipe, cache=False)
     pipe = turnstile.Detrend(pipe, cache=cache)
     return pipe
 
@@ -75,7 +75,10 @@ def slice_lcs(lcs, period, t0, rng=(-1, 1), bins=64):
 
 def extract_features(args):
     bins, pipe, q = args
-    results = pipe.query(**q)
+    try:
+        results = pipe.query(**q)
+    except ValueError:
+        return []
 
     features = []
     for body in results["injection"].bodies:
@@ -104,21 +107,35 @@ def main(N, K, bins):
         queries.append((bins, pipe, q))
 
     pool = Pool()
-    results = pool.map(extract_features, queries)
-    flag, feat = izip(*(izip(*r) for r in results))
-    flag = np.concatenate(flag)
-    feat = np.concatenate(feat, axis=0)
-    return flag, feat
+
+    nmx = 2 * N * K
+    nf = 2 + 2*(bins-1)
+    with h5py.File("simulation.h5", "w") as f:
+        tags_dset = f.create_dataset("tags", shape=(nmx, ), dtype=int)
+        feat_dset = f.create_dataset("features", shape=(nmx, nf), dtype=float)
+
+        n = 0
+        for r in ifilter(len, pool.imap(extract_features, queries)):
+            if not len(r):
+                continue
+            flag, feat = izip(*r)
+            feat = np.vstack(feat)
+
+            dn = len(flag)
+            tags_dset[n:n+dn] = flag
+            feat_dset[n:n+dn, :] = feat
+            n += dn
+
+            f.attrs["length"] = n
+
+    pool.close()
+    pool.join()
 
 
 if __name__ == "__main__":
     np.random.seed(1234)
 
-    N = 3
+    N = 1000
     K = 10
     bins = 64
-
-    flag, feat = main(N, K, bins)
-    with h5py.File("simulation.h5", "w") as f:
-        f.create_dataset("tags", data=flag, dtype=int)
-        f.create_dataset("features", data=feat, dtype=float)
+    main(N, K, bins)
