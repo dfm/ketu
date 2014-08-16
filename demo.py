@@ -8,8 +8,8 @@ import matplotlib.pyplot as pl
 
 import turnstile
 
-r = 0.02
-pmin, pmax = 100, 200.
+r = 0.01
+pmin, pmax = 100, 400.
 periods = np.exp(np.arange(np.log(pmin), np.log(pmax), 0.3*0.3/(4.1*365.)))
 print("Testing {0} periods".format(len(periods)))
 durations = np.array([0.3])  # np.arange(0.3, 0.7, 0.2)
@@ -41,7 +41,7 @@ else:
     pipe0 = turnstile.GPLikelihood(pipe)
 
 pipe = turnstile.Hypotheses(pipe0)
-pipe = turnstile.Search(pipe)
+pipe = turnstile.Search(pipe, cache=False)
 
 q = dict(q1, **q2)
 results = pipe.query(**q)
@@ -50,8 +50,9 @@ results = pipe.query(**q)
 # times = results["times"]
 # depths = results["depths"]
 # d_ivars = results["d_ivars"]
-# pl.plot(times, depths * np.sqrt(d_ivars), "k")
-# # pl.gca().axhline(r ** 2, color="r", lw=3, alpha=0.3)
+# print(np.sqrt(np.mean(depths ** 2 * d_ivars)))
+# pl.plot(times, depths, "k")
+# pl.gca().axhline(1e6 * r ** 2, color="r", lw=3, alpha=0.3)
 # s = results["injection"].bodies[0]
 # for t in s.t0 + np.arange(100) * s.period:
 #     pl.gca().axvline(t, color="r", lw=1, alpha=0.3)
@@ -60,33 +61,35 @@ results = pipe.query(**q)
 # pl.savefig("results/depths.png")
 # assert 0
 
-z = results["grid"][:, :, 0]
+z = results["bic1"][:, :, 0]  # - results["bic2"][:, :, 0]
 zimg = np.array(z)
 zimg[~np.isfinite(zimg)] = 0.0
 x = results["periods"]
 y = np.arange(0, z.shape[1] * results["dt"], results["dt"])
 X, Y = np.meshgrid(x, y, indexing="ij")
 
-pl.figure(figsize=(8, 8))
-pl.pcolormesh(X, Y, zimg, cmap="gray")
 true_period = results["injection"].bodies[0].period
 true_t0 = (results["injection"].bodies[0].t0
            - results["mean_time"]) % true_period
-pl.gca().axvline(true_period, color="r", alpha=0.1, lw=3)
-pl.gca().axhline(true_t0, color="r", alpha=0.1, lw=3)
-pl.colorbar()
-pl.xlim(np.min(x), np.max(x))
-pl.ylim(np.min(y), np.max(y))
-pl.xlabel("period")
-pl.ylabel("offset")
-pl.savefig("results/grid-{0}.png".format(suffix), dpi=300)
+# pl.figure(figsize=(8, 8))
+# pl.pcolormesh(X, Y, zimg, cmap="gray")
+# pl.gca().axvline(true_period, color="r", alpha=0.1, lw=3)
+# pl.gca().axhline(true_t0, color="r", alpha=0.1, lw=3)
+# pl.colorbar()
+# pl.xlim(np.min(x), np.max(x))
+# pl.ylim(np.min(y), np.max(y))
+# pl.xlabel("period")
+# pl.ylabel("offset")
+# pl.savefig("results/grid-{0}.png".format(suffix), dpi=300)
 
-pl.xlim(true_period - 20, true_period + 20)
-pl.ylim(true_t0 - 20, true_t0 + 20)
-pl.savefig("results/grid-{0}-zoom.png".format(suffix), dpi=300)
+# pl.xlim(true_period - 10, true_period + 10)
+# pl.ylim(true_t0 - 10, true_t0 + 10)
+# pl.savefig("results/grid-{0}-zoom.png".format(suffix), dpi=300)
 
-z[np.isnan(z)] = -np.inf
-xi, yi = np.unravel_index(np.argmax(z), z.shape)
+z2 = results["bic2"][:, :, 0]
+z2[~np.isfinite(z2)] = np.inf
+z[~np.isfinite(z)] = np.inf
+xi, yi = np.unravel_index(np.argmin(z), z.shape)
 period, t0 = x[xi], y[yi]
 print(xi, yi, x[xi], y[yi], z[xi, yi])
 
@@ -110,12 +113,17 @@ print(xi, yi, x[xi], y[yi], z[xi, yi])
 # fig.savefig("results/transits-{0}.png".format(suffix))
 
 pl.figure()
-pl.plot(x, np.max(z, axis=1), "k")
+i = (np.arange(len(x)), np.argmin(z, axis=1))
+m = z[i] - 1 < z2[i]
+x = np.array(x)
+pl.plot(x, z[i], "k")
+pl.plot(x, z2[i], "b", alpha=0.3)
+pl.plot(x[m], z[i][m], ".r")
 pl.gca().axvline(true_period, color="r", alpha=0.1, lw=3)
 # pl.ylim(-500, 3000)
 pl.xlabel("period")
 pl.savefig("results/periodogram-{0}.png".format(suffix))
 
-pl.plot(x, np.max(z, axis=1), ".k")
+# pl.plot(x, np.min(z, axis=1), ".k")
 pl.xlim(true_period - 0.5, true_period + 0.5)
 pl.savefig("results/periodogram-{0}-zoom.png".format(suffix))

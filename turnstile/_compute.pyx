@@ -66,7 +66,7 @@ cdef int look_up_time(unsigned int strt, double t0,
     return -1
 
 
-@cython.boundscheck(False)
+# @cython.boundscheck(False)
 def grid_search(double tmin, double tmax, double time_spacing,
                 np.ndarray[DTYPE_t, ndim=2] depths,
                 np.ndarray[DTYPE_t, ndim=2] d_ivars,
@@ -74,21 +74,25 @@ def grid_search(double tmin, double tmax, double time_spacing,
                 np.ndarray[DTYPE_t, ndim=1] periods,
                 double dt):
     # MAGIC
-    cdef unsigned int ndata = 60000
+    cdef double lnn = log(60000) - log(2 * M_PI)
 
     cdef double t0, t, period
     cdef unsigned int i, j, k, l, strt, n
     cdef int ind
 
     cdef unsigned int nperiods = periods.shape[0]
+    cdef unsigned int blah = dll.shape[0]
     cdef unsigned int a = dll.shape[1]
     cdef unsigned int nt
     cdef unsigned int ntmx = int(ceil(periods.max() / dt))
-    cdef unsigned int nind, nimx = int(ceil(periods.min() / (tmax - tmin)))
+    cdef unsigned int nind, nimx = int(ceil((tmax - tmin) / periods.min()))
 
-    cdef np.ndarray[DTYPE_t, ndim=3] results = np.nan + np.zeros((nperiods,
-                                                                  ntmx, a),
-                                                                  dtype=DTYPE)
+    cdef np.ndarray[DTYPE_t, ndim=3] bic1 = np.nan + np.zeros((nperiods,
+                                                               ntmx, a),
+                                                               dtype=DTYPE)
+    cdef np.ndarray[DTYPE_t, ndim=3] bic2 = np.nan + np.zeros((nperiods,
+                                                               ntmx, a),
+                                                               dtype=DTYPE)
     cdef np.ndarray[DTYPE_t, ndim=1] dmax = np.empty(a, dtype=DTYPE)
     cdef np.ndarray[DTYPE_t, ndim=1] ivdmx = np.empty(a, dtype=DTYPE)
     cdef np.ndarray[np.int32_t, ndim=1] inds = np.empty(nimx, dtype=np.int32)
@@ -100,7 +104,7 @@ def grid_search(double tmin, double tmax, double time_spacing,
         for j in range(ntmx):
             # Initialize the results array at zero.
             for k in range(a):
-                results[i, j, k] = 0.0
+                bic2[i, j, k] = 0.0
                 dmax[k] = 0.0
                 ivdmx[k] = 0.0
 
@@ -111,6 +115,7 @@ def grid_search(double tmin, double tmax, double time_spacing,
                 ind = int(round((t - tmin) / time_spacing))
                 if ind > 0:
                     for k in range(a):
+                        bic2[i, j, k] += dll[ind, k]
                         dmax[k] += depths[ind, k] * d_ivars[ind, k]
                         ivdmx[k] += d_ivars[ind, k]
                         inds[nind] = ind
@@ -119,20 +124,27 @@ def grid_search(double tmin, double tmax, double time_spacing,
 
             # Compute the marginalized likelihood.
             for k in range(a):
+                bic2[i, j, k] = -2 * bic2[i, j, k] + (tmax - tmin) / period * lnn
+
                 if ivdmx[k] > 0:
                     dmax[k] /= ivdmx[k]
+
+                    # Compute the maximum likelihood value for the single
+                    # depth model.
                     norm = 0.0
                     for l in range(nind):
                         ind = inds[l]
                         d = depths[ind, k] - dmax[k]
                         norm += dll[ind, k] - 0.5 * d * d * d_ivars[ind, k]
-                    results[i, j, k] = 0.5 * log(2 * M_PI / ivdmx[k]) + norm
+
+                    bic1[i, j, k] = -2 * norm + lnn
+                    # results[i, j, k] = 0.5 * log(2 * M_PI / ivdmx[k]) + norm
                 else:
-                    results[i, j, k] = -np.inf
+                    bic1[i, j, k] = np.inf
 
             # Update the proposal time.
             t0 += dt
             if t0 >= period:
                 break
 
-    return results
+    return bic1, bic2
