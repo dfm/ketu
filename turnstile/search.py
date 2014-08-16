@@ -24,6 +24,7 @@ class Search(Pipeline):
         mu = np.mean(times)
         times -= mu
         grid = grid_search(times.min(), times.max(), time_spacing,
+                           result.pop("depths"), result.pop("d_ivars"),
                            result.pop("dll"),
                            np.atleast_1d(periods), dt)
 

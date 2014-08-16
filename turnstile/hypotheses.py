@@ -29,13 +29,12 @@ class Hypotheses(Pipeline):
         # Pre-allocate the results arrays.
         times = np.concatenate([lc.time for lc in lcs])
         times = np.arange(times.min(), times.max(), dt)
-        grid = np.zeros((len(times), len(depths), len(durations)))
+        grid = np.zeros((len(times), len(durations)))
+        depths = np.zeros((len(times), len(durations)))
+        d_ivars = np.zeros((len(times), len(durations)))
 
         # Loop over the light curves and compute the model for each one.
         for lc in lcs:
-            # Compute the "null" hypothesis likelihood (no transit).
-            ll0 = lc.lnlike(lambda t: np.ones_like(t))
-
             # Find the times that are in this light curve.
             m = (lc.time.min() <= times) * (times <= lc.time.max())
             if not np.any(m):
@@ -43,8 +42,10 @@ class Hypotheses(Pipeline):
 
             # Compute the grid of hypotheses.
             i = np.arange(len(times))[m]
-            compute_hypotheses(lc.lnlike, ll0, times[i.min():i.max()],
-                               depths, durations, grid[i.min():i.max()])
+            imn, imx = i.min(), i.max()
+            compute_hypotheses(lc.lnlike, times[imn:imx], durations,
+                               depths[imn:imx], d_ivars[imn:imx],
+                               grid[imn:imx])
 
         # Build a KDTree index.
         result["times"] = times
@@ -52,5 +53,6 @@ class Hypotheses(Pipeline):
         result["dll"] = grid
         result["rng"] = (times.min(), times.max())
         result["depths"] = depths
+        result["d_ivars"] = d_ivars
         result["durations"] = durations
         return result

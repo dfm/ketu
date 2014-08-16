@@ -5,6 +5,7 @@ from __future__ import division, print_function, unicode_literals
 __all__ = ["BasicLikelihood", "GPLikelihood"]
 
 import numpy as np
+from scipy.linalg import cho_solve
 from emcee.autocorr import integrated_time
 
 import george
@@ -44,10 +45,19 @@ class GPLCWrapper(LCWrapper):
         scale = np.median(np.diff(lc.time)) * integrated_time(lc.flux)
         self.gp = george.GP(var * ExpSquaredKernel(scale ** 2))
         self.gp.compute(lc.time, lc.ferr)
+        self.fm1 = self.flux - 1
+        self.ll0 = -0.5*np.dot(self.fm1, cho_solve(self.gp._factor, self.fm1))
 
     def lnlike(self, model):
-        return self.gp.lnlikelihood(self.flux - model(self.time),
-                                    quiet=True)
+        Cf = cho_solve(self.gp._factor, self.fm1)
+        m = model(self.time)
+        Cm = cho_solve(self.gp._factor, m)
+        ivar = np.dot(m, Cm)
+        if ivar == 0.0:
+            return 0.0, 0.0, 0.0
+        depth = np.dot(m, Cf) / ivar
+        dll = -0.5 * np.dot(self.fm1 - depth * m, Cf - depth * Cm) - self.ll0
+        return dll, depth, ivar
 
 
 class GPLikelihood(Pipeline):
