@@ -4,6 +4,7 @@ from __future__ import division, print_function, unicode_literals
 
 __all__ = ["Prepare"]
 
+import numpy as np
 from .data import LightCurve
 from .pipeline import Pipeline
 
@@ -33,7 +34,8 @@ class Prepare(Pipeline):
         result["data"] = []
         for lc in lcs:
             d = lc.read()
-            t, f, fe = d["TIME"], d["SAP_FLUX"], d["SAP_FLUX_ERR"]
+            t, f, fe = map(np.array, [d["TIME"], d["SAP_FLUX"],
+                                      d["SAP_FLUX_ERR"]])
             q = d["SAP_QUALITY"]
             result["data"] += LightCurve(t, f, fe, q == quality_flag,
                                          normalize=normalize, meta=lc) \

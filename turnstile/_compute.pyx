@@ -66,7 +66,7 @@ cdef int look_up_time(unsigned int strt, double t0,
     return -1
 
 
-# @cython.boundscheck(False)
+@cython.boundscheck(False)
 def grid_search(double tmin, double tmax, double time_spacing,
                 np.ndarray[DTYPE_t, ndim=2] depths,
                 np.ndarray[DTYPE_t, ndim=2] d_ivars,
@@ -124,7 +124,7 @@ def grid_search(double tmin, double tmax, double time_spacing,
 
             # Compute the marginalized likelihood.
             for k in range(a):
-                bic2[i, j, k] = -2 * bic2[i, j, k] + (tmax - tmin) / period * lnn
+                bic2[i, j, k] = -2 * bic2[i, j, k] + nind * lnn
 
                 if ivdmx[k] > 0:
                     dmax[k] /= ivdmx[k]

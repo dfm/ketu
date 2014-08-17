@@ -8,7 +8,7 @@ import matplotlib.pyplot as pl
 
 import turnstile
 
-r = 0.01
+r = 0.015
 pmin, pmax = 100, 400.
 periods = np.exp(np.arange(np.log(pmin), np.log(pmax), 0.3*0.3/(4.1*365.)))
 print("Testing {0} periods".format(len(periods)))
@@ -18,6 +18,7 @@ depths = np.array([1.0])  # np.arange(0.01, 0.04, 0.02) ** 2
 print("Testing {0} depths".format(len(durations)))
 
 q1 = dict(
+    # kicid=11415243,
     kicid=3542566,
     # kicid=12253474,
     injections=[dict(period=114.123, t0=12.5, radius=r)],
@@ -50,9 +51,9 @@ results = pipe.query(**q)
 # times = results["times"]
 # depths = results["depths"]
 # d_ivars = results["d_ivars"]
-# print(np.sqrt(np.mean(depths ** 2 * d_ivars)))
-# pl.plot(times, depths, "k")
-# pl.gca().axhline(1e6 * r ** 2, color="r", lw=3, alpha=0.3)
+# print(np.sqrt(np.median(depths ** 2 * d_ivars)))
+# pl.plot(times, depths * np.sqrt(d_ivars), "k")
+# # pl.gca().axhline(1e6 * r ** 2, color="r", lw=3, alpha=0.3)
 # s = results["injection"].bodies[0]
 # for t in s.t0 + np.arange(100) * s.period:
 #     pl.gca().axvline(t, color="r", lw=1, alpha=0.3)
@@ -68,9 +69,11 @@ x = results["periods"]
 y = np.arange(0, z.shape[1] * results["dt"], results["dt"])
 X, Y = np.meshgrid(x, y, indexing="ij")
 
+# true_period = 168.814
 true_period = results["injection"].bodies[0].period
 true_t0 = (results["injection"].bodies[0].t0
            - results["mean_time"]) % true_period
+
 # pl.figure(figsize=(8, 8))
 # pl.pcolormesh(X, Y, zimg, cmap="gray")
 # pl.gca().axvline(true_period, color="r", alpha=0.1, lw=3)

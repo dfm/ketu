@@ -9,7 +9,7 @@ from scipy.linalg import cho_factor, cho_solve, LinAlgError
 from emcee.autocorr import integrated_time
 
 import george
-from george.kernels import ExpSquaredKernel
+from george.kernels import ExpSquaredKernel, WhiteKernel
 
 from .pipeline import Pipeline
 
@@ -50,7 +50,17 @@ class GPLCWrapper(LCWrapper):
         self.gp = george.GP(var * ExpSquaredKernel(scale ** 2))
         self.gp.compute(self.time, self.ferr)
 
-        # Compute the ln-likelihood of the null hypothesis.
+        # # Compute the ln-likelihood of the null hypothesis.
+        # self.ll0 = 0.0
+        # self.ll0, _, _ = self.lnlike(lambda t: np.zeros_like(t), order=1)
+
+        d = (self.flux - self.gp.predict(self.flux, self.time)[0]) / self.ferr
+        jitter = np.median(d*d)
+
+        self.gp = george.GP(var * ExpSquaredKernel(scale ** 2)
+                            + WhiteKernel(np.sqrt(jitter)))
+        self.gp.compute(self.time, self.ferr)
+
         self.ll0 = 0.0
         self.ll0, _, _ = self.lnlike(lambda t: np.zeros_like(t), order=1)
 
