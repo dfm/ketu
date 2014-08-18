@@ -74,25 +74,25 @@ true_period = results["injection"].bodies[0].period
 true_t0 = (results["injection"].bodies[0].t0
            - results["mean_time"]) % true_period
 
-# pl.figure(figsize=(8, 8))
-# pl.pcolormesh(X, Y, zimg, cmap="gray")
-# pl.gca().axvline(true_period, color="r", alpha=0.1, lw=3)
-# pl.gca().axhline(true_t0, color="r", alpha=0.1, lw=3)
-# pl.colorbar()
-# pl.xlim(np.min(x), np.max(x))
-# pl.ylim(np.min(y), np.max(y))
-# pl.xlabel("period")
-# pl.ylabel("offset")
-# pl.savefig("results/grid-{0}.png".format(suffix), dpi=300)
+pl.figure(figsize=(8, 8))
+pl.pcolormesh(X, Y, zimg, cmap="gray")
+pl.gca().axvline(true_period, color="r", alpha=0.1, lw=3)
+pl.gca().axhline(true_t0, color="r", alpha=0.1, lw=3)
+pl.colorbar()
+pl.xlim(np.min(x), np.max(x))
+pl.ylim(np.min(y), np.max(y))
+pl.xlabel("period")
+pl.ylabel("offset")
+pl.savefig("results/grid-{0}.png".format(suffix), dpi=300)
 
-# pl.xlim(true_period - 10, true_period + 10)
-# pl.ylim(true_t0 - 10, true_t0 + 10)
-# pl.savefig("results/grid-{0}-zoom.png".format(suffix), dpi=300)
+pl.xlim(true_period - 10, true_period + 10)
+pl.ylim(true_t0 - 10, true_t0 + 10)
+pl.savefig("results/grid-{0}-zoom.png".format(suffix), dpi=300)
 
 z2 = results["bic2"][:, :, 0]
-z2[~np.isfinite(z2)] = np.inf
-z[~np.isfinite(z)] = np.inf
-xi, yi = np.unravel_index(np.argmin(z), z.shape)
+z2[~np.isfinite(z2)] = -np.inf
+z[~np.isfinite(z)] = -np.inf
+xi, yi = np.unravel_index(np.argmax(z), z.shape)
 period, t0 = x[xi], y[yi]
 print(xi, yi, x[xi], y[yi], z[xi, yi])
 
@@ -116,8 +116,8 @@ print(xi, yi, x[xi], y[yi], z[xi, yi])
 # fig.savefig("results/transits-{0}.png".format(suffix))
 
 pl.figure()
-i = (np.arange(len(x)), np.argmin(z, axis=1))
-m = z[i] - 1 < z2[i]
+i = (np.arange(len(x)), np.argmax(z, axis=1))
+m = z[i] + 1 > z2[i]
 x = np.array(x)
 pl.plot(x, z[i], "k")
 pl.plot(x, z2[i], "b", alpha=0.3)

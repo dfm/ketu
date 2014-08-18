@@ -74,7 +74,8 @@ def grid_search(double tmin, double tmax, double time_spacing,
                 np.ndarray[DTYPE_t, ndim=1] periods,
                 double dt):
     # MAGIC
-    cdef double lnn = log(60000) - log(2 * M_PI)
+    cdef double lnn = -0.5 * (log(60000) - log(2 * M_PI))
+    cdef double CONST =  - 0.5 * log(2 * M_PI)
 
     cdef double t0, t, period
     cdef unsigned int i, j, k, l, strt, n
@@ -93,8 +94,13 @@ def grid_search(double tmin, double tmax, double time_spacing,
     cdef np.ndarray[DTYPE_t, ndim=3] bic2 = np.nan + np.zeros((nperiods,
                                                                ntmx, a),
                                                                dtype=DTYPE)
-    cdef np.ndarray[DTYPE_t, ndim=1] dmax = np.empty(a, dtype=DTYPE)
-    cdef np.ndarray[DTYPE_t, ndim=1] ivdmx = np.empty(a, dtype=DTYPE)
+    cdef np.ndarray[DTYPE_t, ndim=3] dmax = np.nan + np.zeros((nperiods,
+                                                               ntmx, a),
+                                                               dtype=DTYPE)
+    cdef np.ndarray[DTYPE_t, ndim=3] ivdmx = np.nan + np.zeros((nperiods,
+                                                               ntmx, a),
+                                                               dtype=DTYPE)
+
     cdef np.ndarray[np.int32_t, ndim=1] inds = np.empty(nimx, dtype=np.int32)
     cdef double norm, d
 
@@ -105,8 +111,8 @@ def grid_search(double tmin, double tmax, double time_spacing,
             # Initialize the results array at zero.
             for k in range(a):
                 bic2[i, j, k] = 0.0
-                dmax[k] = 0.0
-                ivdmx[k] = 0.0
+                dmax[i, j, k] = 0.0
+                ivdmx[i, j, k] = 0.0
 
             # Loop over transit times for this given period and phase.
             nind, ind, strt = 0, 0, 0
@@ -115,32 +121,29 @@ def grid_search(double tmin, double tmax, double time_spacing,
                 ind = int(round((t - tmin) / time_spacing))
                 if ind > 0:
                     for k in range(a):
-                        bic2[i, j, k] += dll[ind, k]
-                        dmax[k] += depths[ind, k] * d_ivars[ind, k]
-                        ivdmx[k] += d_ivars[ind, k]
+                        bic2[i, j, k] += dll[ind, k] + 0.5 * log(d_ivars[ind, k]) + CONST
+
+                        dmax[i, j, k] += depths[ind, k] * d_ivars[ind, k]
+                        ivdmx[i, j, k] += d_ivars[ind, k]
+
                         inds[nind] = ind
                         nind += 1
                 t += period
 
             # Compute the marginalized likelihood.
             for k in range(a):
-                bic2[i, j, k] = -2 * bic2[i, j, k] + nind * lnn
+                bic1[i, j, k] = bic2[i, j, k] + lnn
+                bic2[i, j, k] += nind * lnn
 
-                if ivdmx[k] > 0:
-                    dmax[k] /= ivdmx[k]
+                if ivdmx[i, j, k] > 0:
+                    dmax[i, j, k] /= ivdmx[i, j, k]
 
-                    # Compute the maximum likelihood value for the single
-                    # depth model.
-                    norm = 0.0
                     for l in range(nind):
                         ind = inds[l]
-                        d = depths[ind, k] - dmax[k]
-                        norm += dll[ind, k] - 0.5 * d * d * d_ivars[ind, k]
-
-                    bic1[i, j, k] = -2 * norm + lnn
-                    # results[i, j, k] = 0.5 * log(2 * M_PI / ivdmx[k]) + norm
+                        d = depths[ind, k] - dmax[i, j, k]
+                        bic1[i, j, k] -= 0.5 * d * d * d_ivars[ind, k]
                 else:
-                    bic1[i, j, k] = np.inf
+                    bic1[i, j, k] = -np.inf
 
             # Update the proposal time.
             t0 += dt
