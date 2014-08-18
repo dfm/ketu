@@ -150,4 +150,4 @@ def grid_search(double tmin, double tmax, double time_spacing,
             if t0 >= period:
                 break
 
-    return bic1, bic2
+    return bic1, bic2, dmax, ivdmx
