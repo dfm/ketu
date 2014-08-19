@@ -10,7 +10,7 @@ q = dict(kicid=3542566)
 period, t0 = 325.03, 156.06
 
 pipe = turnstile.Inject(pipe)
-q["injections"] = [dict(radius=0.03, period=period, t0=t0)]
+q["injections"] = [dict(radius=0.02, period=period, t0=t0)]
 
 pipe = turnstile.Prepare(pipe)
 pipe = turnstile.GPLikelihood(pipe)
@@ -21,6 +21,7 @@ q["durations"] = 0.2
 pipe = turnstile.TwoDSearch(pipe, cache=False)
 q["min_period"] = 100
 q["max_period"] = 400
+# q["alpha"] = np.log(100000)-np.log(2*np.pi)
 
 response = pipe.query(**q)
 

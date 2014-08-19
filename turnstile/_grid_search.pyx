@@ -22,12 +22,11 @@ def grid_search(double alpha,
     cdef double CONST = -0.5*log(2*M_PI)
 
     cdef double t0, t, period, d
-    cdef unsigned int i, j, k, l, strt, n, ind
+    cdef unsigned int i, j, k, l, ind
 
     # Array dimensions.
     cdef unsigned int nperiod = periods.shape[0]
     cdef unsigned int nduration = dll_1d.shape[1]
-    cdef unsigned int nt
 
     # The maximum number of phase points.
     cdef unsigned int ntmx = int(ceil(periods.max() / dt))
@@ -65,7 +64,7 @@ def grid_search(double alpha,
             # We'll start from the earliest possible transit time (this will
             # often be before the beginning of the time series.
             t = tmin + t0 # fmod(t0, period) + period * floor(tmin / period)
-            nind, ind, strt = 0, 0, 0
+            nind, ind = 0, 0
             while t <= tmax - time_spacing:
                 # Compute the nearest 1-d index for this transit time.
                 ind = int(round((t - tmin) / time_spacing))

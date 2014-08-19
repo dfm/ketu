@@ -17,13 +17,17 @@ if "publish" in sys.argv[1:]:
     sys.exit()
 
 # Set up the extension.
+kwargs = dict(
+    include_dirs=[numpy.get_include()],
+    extra_compile_args=["-Wno-unused-function", "-Wno-uninitialized"],
+)
 exts = [
     Extension("turnstile._compute", sources=["turnstile/_compute.pyx"],
-              include_dirs=[numpy.get_include()]),
+              **kwargs),
     Extension("turnstile._grid_search", sources=["turnstile/_grid_search.pyx"],
-              include_dirs=[numpy.get_include()]),
+              **kwargs),
     Extension("turnstile._gp", sources=["turnstile/_gp.pyx"],
-              include_dirs=[numpy.get_include()]),
+              **kwargs),
 ]
 
 # Hackishly inject a constant into builtins to enable importing of the
