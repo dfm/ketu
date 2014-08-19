@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-__version__ = "0.0.1"
+__version__ = "0.1.0"
 
 try:
     __TURNSTILE_SETUP__
@@ -16,6 +16,6 @@ if not __TURNSTILE_SETUP__:
     from .inject import Inject
     from .prepare import Prepare
     from .detrend import Detrend
-    from .likelihood import BasicLikelihood, GPLikelihood
+    from .likelihood import GPLikelihood
     from .hypotheses import Hypotheses
     from .search import Search

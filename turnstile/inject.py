@@ -9,67 +9,62 @@ import numpy as np
 from .pipeline import Pipeline
 
 
+class Inject(Pipeline):
+
+    query_parameters = dict(
+        q1=(0.5, False),
+        q2=(0.5, False),
+        mstar=(1.0, False),
+        rstar=(1.0, False),
+        injections=([], False),
+    )
+
+    def get_result(self, query, parent_response):
+        # Parse the arguments.
+        injections = query["injections"]
+        if not len(injections):
+            return dict(datasets=parent_response.datasets)
+
+        # Build the system.
+        q1 = query["q1"]
+        q2 = query["q2"]
+        mstar = query["mstar"]
+        rstar = query["rstar"]
+        s = transit.System(transit.Central(q1=q1, q2=q2, mass=mstar,
+                                           radius=rstar))
+
+        # Loop over injected bodies and add them to the system.
+        for inj in injections:
+            body = transit.Body(r=inj["radius"], period=inj["period"],
+                                t0=inj["t0"], b=inj.get("b", 0.0),
+                                e=inj.get("e", 0.0),
+                                pomega=inj.get("pomega", 0.0))
+            s.add_body(body)
+
+        # Inject the transit into each dataset.
+        results = []
+        for _ in parent_response.datasets:
+            lc = InjectedLightCurve(_)
+            lc.flux[lc.m] *= s.light_curve(lc.time[lc.m])
+            results.append(lc)
+
+        return dict(datasets=results, injected_system=s)
+
+
 class InjectedLightCurve(object):
 
     def __init__(self, lc):
+        for k, v in lc.params.iteritems():
+            setattr(self, k, v)
+
         d = lc.read()
         self.time = np.array(d["TIME"], dtype=np.float64)
         self.flux = np.array(d["SAP_FLUX"], dtype=np.float64)
         self.ferr = np.array(d["SAP_FLUX_ERR"], dtype=np.float64)
-        self.q = np.array(d["SAP_QUALITY"], dtype=np.float64)
+        self.q = np.array(d["SAP_QUALITY"], dtype=int)
         self.m = (np.isfinite(self.time) * np.isfinite(self.flux)
                   * np.isfinite(self.ferr))
 
     def read(self):
         return dict(TIME=self.time, SAP_FLUX=self.flux, SAP_FLUX_ERR=self.ferr,
                     SAP_QUALITY=self.q)
-
-
-class Inject(Pipeline):
-
-    defaults = dict(
-        q1=0.5,
-        q2=0.5,
-        mstar=1.0,
-        rstar=1.0,
-        b=0.0,
-        e=0.0,
-        pomega=0.0,
-        injections=[]
-    )
-
-    def get_result(self, **kwargs):
-        # Build the system.
-        q1 = self.get_arg("q1", kwargs)
-        q2 = self.get_arg("q2", kwargs)
-        mstar = self.get_arg("mstar", kwargs)
-        rstar = self.get_arg("rstar", kwargs)
-        s = transit.System(transit.Central(q1=q1, q2=q2, mass=mstar,
-                                           radius=rstar))
-
-        # Parse the arguments.
-        injections = self.get_arg("injections", kwargs)
-        if not len(injections):
-            return self.parent.query(**kwargs)
-        for inj in injections:
-            body = transit.Body(r=inj["radius"], period=inj["period"],
-                                t0=inj["t0"], b=self.get_arg("b", inj),
-                                e=self.get_arg("e", inj),
-                                pomega=self.get_arg("pomega", inj))
-            s.add_body(body)
-
-        # Get the datasets.
-        result = self.parent.query(**kwargs)
-
-        # Inject the transit into each dataset.
-        lcs = result.pop("data")
-        result["data"] = []
-        for _ in lcs:
-            lc = InjectedLightCurve(_)
-            lc.flux[lc.m] *= s.light_curve(lc.time[lc.m])
-            result["data"].append(lc)
-
-        # Save the injection system.
-        result["injection"] = s
-
-        return result

@@ -17,8 +17,12 @@ if "publish" in sys.argv[1:]:
     sys.exit()
 
 # Set up the extension.
-ext = Extension("turnstile._compute", sources=["turnstile/_compute.pyx"],
-                include_dirs=[numpy.get_include()])
+exts = [
+    Extension("turnstile._compute", sources=["turnstile/_compute.pyx"],
+              include_dirs=[numpy.get_include()]),
+    Extension("turnstile._gp", sources=["turnstile/_gp.pyx"],
+              include_dirs=[numpy.get_include()]),
+]
 
 # Hackishly inject a constant into builtins to enable importing of the
 # package before the library is built.
@@ -37,7 +41,7 @@ setup(
     author="Daniel Foreman-Mackey",
     author_email="danfm@nyu.edu",
     packages=["turnstile"],
-    ext_modules=cythonize([ext]),
+    ext_modules=cythonize(exts),
     url="http://github.com/dfm/turnstile",
     license="MIT",
     description="MOAR Planets",

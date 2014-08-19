@@ -2,95 +2,91 @@
 
 from __future__ import division, print_function, unicode_literals
 
-__all__ = ["BasicLikelihood", "GPLikelihood"]
+__all__ = ["GPLikelihood"]
 
 import numpy as np
-from scipy.linalg import cho_factor, cho_solve, LinAlgError
 from emcee.autocorr import integrated_time
-
-import george
-from george.kernels import ExpSquaredKernel, WhiteKernel
+from scipy.linalg import cho_factor, cho_solve, LinAlgError
 
 from .pipeline import Pipeline
+from ._gp import compute_kernel_matrix
+
+
+class GPLikelihood(Pipeline):
+
+    def __init__(self, *args, **kwargs):
+        kwargs["cache"] = kwargs.pop("cache", False)
+        super(GPLikelihood, self).__init__(*args, **kwargs)
+
+    def get_result(self, query, parent_response):
+        lcs = map(LCWrapper, parent_response.light_curves)
+        return dict(gp_light_curves=lcs)
 
 
 class LCWrapper(object):
 
     def __init__(self, lc):
-        self.lc = lc
         self.time = lc.time
         self.flux = lc.flux
         self.ferr = lc.ferr
-        self.ivar = 1.0 / self.ferr ** 2
-
-    def lnlike(self, model):
-        return -0.5 * np.sum((self.flux - model(self.time)) ** 2 * self.ivar)
-
-
-class BasicLikelihood(Pipeline):
-
-    def get_result(self, **kwargs):
-        result = self.parent.query(**kwargs)
-        result["data"] = map(LCWrapper, result.pop("data"))
-        return result
-
-
-class GPLCWrapper(LCWrapper):
-
-    def __init__(self, lc):
-        super(GPLCWrapper, self).__init__(lc)
 
         # Convert to PPM.
         self.flux = (self.flux - 1) * 1e6
         self.ferr *= 1e6
 
         # Estimate the hyperparameters.
-        var = float(np.var(self.flux))
+        self.var = np.var(self.flux)
         scale = np.median(np.diff(self.time)) * integrated_time(self.flux)
-        self.gp = george.GP(var * ExpSquaredKernel(scale ** 2))
-        self.gp.compute(self.time, self.ferr)
+        self.tau = scale ** 2
 
-        # # Compute the ln-likelihood of the null hypothesis.
-        # self.ll0 = 0.0
-        # self.ll0, _, _ = self.lnlike(lambda t: np.zeros_like(t), order=1)
+        # Build the kernel matrix.
+        x = np.atleast_2d(self.time).T
+        self.K = compute_kernel_matrix(self.var, self.tau, x)
+        Kobs = np.array(self.K)
+        Kobs[np.diag_indices_from(Kobs)] += self.ferr ** 2
+        self.factor = cho_factor(Kobs, overwrite_a=True)
 
-        d = (self.flux - self.gp.predict(self.flux, self.time)[0]) / self.ferr
-        jitter = np.median(d*d)
-
-        self.gp = george.GP(var * ExpSquaredKernel(scale ** 2)
-                            + WhiteKernel(np.sqrt(jitter)))
-        self.gp.compute(self.time, self.ferr)
-
+        # Compute the likelihood of the null model.
         self.ll0 = 0.0
-        self.ll0, _, _ = self.lnlike(lambda t: np.zeros_like(t), order=1)
+        self.ll0, _, _ = self.lnlike(order=1)
 
-    def lnlike(self, model, order=2):
-        # Precompute some useful factors.
-        Cf = cho_solve(self.gp._factor, self.flux)
-        m = np.vander(model(self.time), order)
+    def linear_maximum_likelihood(self, model=None, order=2):
+        if model is None:
+            model = np.zeros_like(self.time)
+            order = 1
+        else:
+            model = model(self.time)
+        m = np.vander(model, order)
         mT = m.T
-        Cm = cho_solve(self.gp._factor, m)
+
+        # Precompute some useful factors.
+        Cf = cho_solve(self.factor, self.flux)
+        Cm = cho_solve(self.factor, m)
         S = np.dot(mT, Cm)
 
-        # Solve for the maximum likelihood depth.
+        # Solve for the maximum likelihood model.
+        factor = cho_factor(S, overwrite_a=True)
+        w = cho_solve(factor, np.dot(mT, Cf), overwrite_b=True)
+        sigma = cho_solve(factor, np.eye(len(S)), overwrite_b=True)
+
+        return w, m, sigma, Cf, Cm
+
+    def predict(self, model=None, order=2):
         try:
-            factor = cho_factor(S, overwrite_a=True)
-            w = cho_solve(factor, np.dot(mT, Cf), overwrite_b=True)
+            w, m, sigma, Cf, Cm = self.linear_maximum_likelihood(model, order)
+        except LinAlgError:
+            w, m, sigma, Cf, Cm = self.linear_maximum_likelihood()
+        return np.dot(m, w) + np.dot(self.K, Cf - np.dot(Cm, w))
+
+    def lnlike(self, model=None, order=2):
+        try:
+            w, m, sigma, Cf, Cm = self.linear_maximum_likelihood(model, order)
         except LinAlgError:
             return 0.0, 0.0, 0.0
-        else:
-            ivar = 1.0 / cho_solve(factor, np.eye(len(S)),
-                                   overwrite_b=True)[0, 0]
+
         depth = w[0]
+        ivar = 1.0 / sigma[0, 0]
 
         # Compute the value of the likelihood at its maximum.
         dll = -0.5*np.dot(self.flux-np.dot(m, w), Cf-np.dot(Cm, w)) - self.ll0
         return dll, depth, ivar
-
-
-class GPLikelihood(Pipeline):
-
-    def get_result(self, **kwargs):
-        result = self.parent.query(**kwargs)
-        result["data"] = map(GPLCWrapper, result.pop("data"))
-        return result
