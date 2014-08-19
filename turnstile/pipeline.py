@@ -167,5 +167,11 @@ class PipelineResult(object):
                 raise AttributeError("Missing required parameter '{0}'"
                                      .format(k))
             return v
+        if k in self.pipeline_element.parent.query_parameters:
+            v, r = self.pipeline_element.parent.query_parameters[k]
+            if r:
+                raise AttributeError("Missing required parameter '{0}'"
+                                     .format(k))
+            return v
 
         return getattr(self.pipeline_element.parent.query(**(self.query)), k)

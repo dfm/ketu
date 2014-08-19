@@ -20,6 +20,8 @@ if "publish" in sys.argv[1:]:
 exts = [
     Extension("turnstile._compute", sources=["turnstile/_compute.pyx"],
               include_dirs=[numpy.get_include()]),
+    Extension("turnstile._grid_search", sources=["turnstile/_grid_search.pyx"],
+              include_dirs=[numpy.get_include()]),
     Extension("turnstile._gp", sources=["turnstile/_gp.pyx"],
               include_dirs=[numpy.get_include()]),
 ]
