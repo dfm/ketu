@@ -10,6 +10,7 @@ DTYPE = np.float64
 ctypedef np.float64_t DTYPE_t
 
 
+@cython.boundscheck(False)
 def compute_kernel_matrix(double alpha, double tau,
                           np.ndarray[DTYPE_t, ndim=2] x):
     cdef double d, v, itau = -0.5 / tau

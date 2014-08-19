@@ -20,7 +20,7 @@ class GPLikelihood(Pipeline):
 
     def get_result(self, query, parent_response):
         lcs = map(LCWrapper, parent_response.light_curves)
-        return dict(gp_light_curves=lcs)
+        return dict(model_light_curves=lcs)
 
 
 class LCWrapper(object):

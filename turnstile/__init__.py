@@ -9,7 +9,7 @@ except NameError:
 
 if not __TURNSTILE_SETUP__:
     __all__ = ["Pipeline", "Download", "Inject", "Prepare", "Detrend",
-               "BasicLikelihood", "GPLikelihood", "Hypotheses", "Search"]
+               "GPLikelihood", "OneDSearch", "Search"]
 
     from .pipeline import Pipeline
     from .download import Download
@@ -17,5 +17,5 @@ if not __TURNSTILE_SETUP__:
     from .prepare import Prepare
     from .detrend import Detrend
     from .likelihood import GPLikelihood
-    from .hypotheses import Hypotheses
+    from .one_d_search import OneDSearch
     from .search import Search

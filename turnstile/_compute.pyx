@@ -48,25 +48,6 @@ def compute_hypotheses(lnlikefn, np.ndarray[DTYPE_t, ndim=1] t,
 
 
 @cython.boundscheck(False)
-cdef int look_up_time(unsigned int strt, double t0,
-                      np.ndarray[DTYPE_t, ndim=1] times,
-                      double tol):
-    cdef double d1, d2
-    cdef unsigned int i
-    cdef unsigned int n = times.shape[0]
-    for i in range(strt+1, n):
-        if times[i] >= t0:
-            d1 = times[i] - t0
-            d2 = t0 - times[i-1]
-            if d1 > tol and d2 > tol:
-                return -1
-            if d1 < d2:
-                return i
-            return i-1
-    return -1
-
-
-@cython.boundscheck(False)
 def grid_search(double tmin, double tmax, double time_spacing,
                 np.ndarray[DTYPE_t, ndim=2] depths,
                 np.ndarray[DTYPE_t, ndim=2] d_ivars,
