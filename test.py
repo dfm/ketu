@@ -28,7 +28,6 @@ q["alpha"] = np.log(60000)-np.log(2*np.pi)
 
 response = pipe.query(**q)
 
-periods = response.periods
 z1 = response.phic_same[:, :, 0]
 z1[np.isnan(z1)] = -np.inf
 z2 = response.phic_variable[:, :, 0]
@@ -39,36 +38,37 @@ depth[np.isnan(depth)] = 0.0
 z1[z2 > z1] = -np.inf
 z1[depth <= 0.0] = -np.inf
 
-y = np.arange(0, max(periods), response.dt)
-xi, yi = np.unravel_index(np.argmax(z1), z1.shape)
-period, t0 = periods[xi], y[yi]
-print(period, t0)
+periods = response.period_2d
+y = response.t0_2d
+for i in np.argsort(z1.flatten())[-10:]:
+    xi, yi = np.unravel_index(i, z1.shape)
+    period, t0 = periods[xi], y[yi]
+    print(period, t0, depth[xi, yi], response.depth_ivar_2d[xi, yi, 0])
 
 i = (np.arange(len(periods)), np.argmax(z1, axis=1))
 pl.plot(periods, z1[i], "k")
-pl.plot(periods, z2[i], "r")
+# pl.plot(periods, z2[i], "r")
 pl.gca().axvline(period, color="r", lw=3, alpha=0.3)
 pl.xlabel("period")
 pl.ylabel("PHIC")
 pl.savefig("periodogram-kic-{0}.png".format(q["kicid"]))
 
-# assert 0
-
-# times_1d = np.arange(response.min_time_1d, response.max_time_1d,
-#                      response.time_spacing)
-# pl.plot(times_1d, response.dll_1d + 0.5 * np.log(response.depth_ivar_1d), "k")
+times_1d = np.arange(response.min_time_1d, response.max_time_1d,
+                     response.time_spacing)
+pl.clf()
+pl.plot(times_1d, response.dll_1d, "k")
 # t = t0 + (period) * np.arange(9)
 # i = np.round((t - response.min_time_1d) / response.time_spacing).astype(int)
 # l = response.dll_1d[i] + 0.5 * np.log(response.depth_ivar_1d[i])
 # print(np.sum(l))
 
-# for i in range(10):
-#     t = t0 + i * period
-#     pl.gca().axvline(t, color="r", lw=3, alpha=0.3)
+for i in range(10):
+    t = t0 + i * period
+    pl.gca().axvline(t, color="r", lw=3, alpha=0.3)
 # pl.ylim(-10, 100)
-# pl.savefig("dude.png")
+pl.xlim(times_1d.min(), times_1d.max())
+pl.savefig("dude.png")
 
-# assert 0
 # print(response.gp_light_curves[0])
 
 

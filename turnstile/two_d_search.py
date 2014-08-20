@@ -19,7 +19,7 @@ class TwoDSearch(Pipeline):
         min_period=(None, True),
         max_period=(None, True),
         delta_log_period=(None, False),
-        dt=(0.3, False),
+        dt=(0.1, False),
         alpha=(np.log(60000)-np.log(2*np.pi), False)
     )
 
@@ -51,7 +51,8 @@ class TwoDSearch(Pipeline):
         phic_same, phic_variable, depth_2d, depth_ivar_2d = results
 
         return dict(
-            periods=periods,
+            period_2d=periods,
+            t0_2d=np.arange(0, max(periods), dt) + tmin + mean_time,
             phic_same=phic_same, phic_variable=phic_variable,
             depth_2d=depth_2d, depth_ivar_2d=depth_ivar_2d,
         )
@@ -62,7 +63,9 @@ class TwoDSearch(Pipeline):
         except os.error:
             pass
         with h5py.File(fn, "w") as f:
-            f.create_dataset("periods", data=response["periods"],
+            f.create_dataset("period_2d", data=response["period_2d"],
+                             compression="gzip")
+            f.create_dataset("t0_2d", data=response["t0_2d"],
                              compression="gzip")
             f.create_dataset("phic_same", data=response["phic_same"],
                              compression="gzip")
@@ -78,7 +81,8 @@ class TwoDSearch(Pipeline):
             with h5py.File(fn, "r") as f:
                 try:
                     return dict(
-                        periods=f["periods"][...],
+                        period_2d=f["period_2d"][...],
+                        t0_2d=f["t0_2d"][...],
                         phic_same=f["phic_same"][...],
                         phic_variable=f["phic_variable"][...],
                         depth_2d=f["depth_2d"][...],
