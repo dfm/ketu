@@ -79,7 +79,7 @@ def time_warp(t):
 def model(t):
     t = time_warp(t)
     r = np.zeros_like(t)
-    r[np.fabs(t) < 0.5 * response.durations] = -1
+    r[np.fabs(t) < 0.5 * 0.2] = -1
     return r
 
 

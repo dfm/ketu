@@ -25,10 +25,11 @@ class GPLikelihood(Pipeline):
 
 class LCWrapper(object):
 
-    def __init__(self, lc):
+    def __init__(self, lc, length_factor=10):
         self.time = lc.time
         self.flux = lc.flux
         self.ferr = lc.ferr
+        self.predictors = lc.predictors - 1
 
         # Convert to PPM.
         self.flux = (self.flux - 1) * 1e6
@@ -38,10 +39,14 @@ class LCWrapper(object):
         self.var = np.var(self.flux)
         scale = np.median(np.diff(self.time)) * integrated_time(self.flux)
         self.tau = scale ** 2
+        x = self.predictors
+        d = (x[np.random.randint(len(x), size=10000)] -
+             x[np.random.randint(len(x), size=10000)])
+        self.ell = length_factor * np.mean(np.sum(d**2, axis=1))
 
         # Build the kernel matrix.
-        x = np.atleast_2d(self.time).T
-        self.K = compute_kernel_matrix(self.var, self.tau, x)
+        self.K = compute_kernel_matrix(self.var, self.tau, self.time, self.ell,
+                                       x)
         Kobs = np.array(self.K)
         Kobs[np.diag_indices_from(Kobs)] += self.ferr ** 2
         self.factor = cho_factor(Kobs, overwrite_a=True)

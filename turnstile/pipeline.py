@@ -8,7 +8,6 @@ import os
 import gzip
 import json
 import time
-import h5py
 import hashlib
 import cPickle as pickle
 
@@ -119,42 +118,27 @@ class Pipeline(object):
         if self.cache:
             self.save_to_cache(fn, response)
 
-        return PipelineResult(self, kwargs, response)
+        return PipelineResult(self, kwargs, response, parent_response)
 
     def get_result(self, **kwargs):
         raise NotImplementedError("Subclasses should implement this method")
 
 
-class HDF5Pipeline(Pipeline):
-
-    cache_ext = ".h5"
-
-    def save_to_cache(self, fn, response):
-        try:
-            os.makedirs(os.path.dirname(fn))
-        except os.error:
-            pass
-
-        with h5py.File(fn, "w") as f:
-            for k, v in response.iteritems():
-                f.create_dataset(k, data=v)
-
-    def load_from_cache(self, fn):
-        if os.path.exists(fn):
-            response = {}
-            with h5py.File(fn, "r") as f:
-                for k in f:
-                    response[k] = f[k][...]
-            return response
-        return None
-
-
 class PipelineResult(object):
 
-    def __init__(self, pipeline_element, query, response):
+    def __init__(self, pipeline_element, query, response,
+                 parent_response=None):
         self.pipeline_element = pipeline_element
         self.query = query
         self.response = response
+        self._parent_response = parent_response
+
+    @property
+    def parent_response(self):
+        if self._parent_response is None:
+            self._parent_response = \
+                self.pipeline_element.parent.query(**(self.query))
+        return self._parent_response
 
     def __getattr__(self, k):
         if k in self.response:
@@ -167,6 +151,9 @@ class PipelineResult(object):
                 raise AttributeError("Missing required parameter '{0}'"
                                      .format(k))
             return v
+        if self.pipeline_element.parent is None:
+            raise AttributeError("Unrecognized parameter '{0}'"
+                                 .format(k))
         if k in self.pipeline_element.parent.query_parameters:
             v, r = self.pipeline_element.parent.query_parameters[k]
             if r:
@@ -174,4 +161,4 @@ class PipelineResult(object):
                                      .format(k))
             return v
 
-        return getattr(self.pipeline_element.parent.query(**(self.query)), k)
+        return getattr(self.parent_response, k)

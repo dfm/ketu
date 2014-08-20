@@ -4,8 +4,8 @@ from __future__ import division, print_function, unicode_literals
 
 __all__ = ["Prepare"]
 
-import copy
 import numpy as np
+from itertools import izip
 
 from .pipeline import Pipeline
 
@@ -13,143 +13,95 @@ from .pipeline import Pipeline
 class Prepare(Pipeline):
 
     query_parameters = {
-        "split_tol": (0.5, False),
-        "min_chunk_length": (100, False),
+        "split_tol": (20, False),
+        "min_chunk_size": (0, False),
     }
 
     def get_result(self, query, parent_response):
         split_tol = query["split_tol"]
-        min_chunk_length = query["min_chunk_length"]
+        min_chunk_size = query["min_chunk_size"]
 
-        # Loop over the light curves and set them up.
-        lcs = []
-        for lc in parent_response.datasets:
-            d = lc.read()
-            time = np.array(d["TIME"], dtype=np.float64)
-            flux = np.array(d["SAP_FLUX"], dtype=np.float64)
-            ferr = np.array(d["SAP_FLUX_ERR"], dtype=np.float64)
-            q = np.array(d["SAP_QUALITY"], dtype=int)
-            lcs += LightCurve(time, flux, ferr, q,
-                              quarter=lc.sci_data_quarter).autosplit(split_tol)
+        chunks = []
+        for lc, plcs in izip(parent_response.target_datasets,
+                             parent_response.predictor_datasets):
+            chunks += prepare_light_curve(lc, plcs, tol=split_tol,
+                                          min_length=min_chunk_size)
 
-        # Get rid of light curves that are too short.
-        lcs = [lc for lc in lcs if len(lc) >= min_chunk_length]
-        if not len(lcs):
+        if not len(chunks):
             raise ValueError("No light curves were retained after Prepare")
 
-        return dict(light_curves=lcs)
+        return dict(light_curves=chunks)
+
+
+def prepare_light_curve(lc, plcs, tol=20, min_length=0):
+    data = lc.read(columns=["TIME", "SAP_FLUX", "SAP_FLUX_ERR", "SAP_QUALITY"])
+    time = data["TIME"]
+    flux = data["SAP_FLUX"]
+    ferr = data["SAP_FLUX_ERR"]
+    qual = data["SAP_QUALITY"]
+
+    # Loop over the time array and break it into "chunks" when there is "a
+    # sufficiently long gap" with no data.
+    count, current, chunks = 0, [], []
+    for i, t in enumerate(time):
+        if np.isnan(t):
+            count += 1
+        else:
+            if count > tol:
+                chunks.append(list(current))
+                current = []
+                count = 0
+            current.append(i)
+    if len(current):
+        chunks.append(current)
+
+    # Loop over the predictors and read the data.
+    predictors = [l.read(columns=["SAP_FLUX"])["SAP_FLUX"] for l in plcs]
+
+    # Loop over the chunks and construct the output.
+    light_curves = []
+    for chunk in chunks:
+        if len(chunk) < min_length:
+            continue
+        light_curves.append(LightCurve(time[chunk], flux[chunk], ferr[chunk],
+                                       qual[chunk],
+                                       (p[chunk] for p in predictors)))
+
+    return light_curves
 
 
 class LightCurve(object):
-    """
-    A wrapper object around a Kepler light curve. When initializing, any
-    missing data are masked and then fluxes (and uncertainties) are
-    normalized by the median.
 
-    :param time:
-        The timestamps in days (KBJD).
-
-    :param flux:
-        The fluxes corresponding to the timestamps in ``time``.
-
-    :param ferr:
-        The uncertainties on ``flux``.
-
-    :param quality: (optional)
-        If provided, this should be a boolean array where ``True`` indicates
-        "good" measurements and ``False`` indicates measurements that should
-        be removed. Any NaNs are removed automatically so you don't need to
-        include the mask for that in here.
-
-    """
-
-    def __init__(self, time, flux, ferr, quality=None, quarter=None,
-                 normalize=True):
-        self.quarter = quarter
-
-        # Mask bad data.
-        m = np.isfinite(time)
-        self.time = np.atleast_1d(time)[m]
-        self.flux = np.atleast_1d(flux)[m]
-        self.ferr = np.atleast_1d(ferr)[m]
-
-        # Interpolate over missing/bad data.
-        good = np.isfinite(self.flux)*np.isfinite(self.ferr)
-        if quality is not None:
-            good *= quality[m] == 0
-        self.flux[~good] = np.interp(self.time[~good], self.time[good],
-                                     self.flux[good])
-        self.ferr[~good] = np.mean(self.ferr[good])
+    def __init__(self, time, flux, ferr, quality, predictors):
+        # Mask missing data in the target light curve.
+        m = np.isfinite(time)*np.isfinite(flux)*np.isfinite(ferr)
+        m *= quality == 0
+        self.time = np.array(time, dtype=np.float64)[m]
+        self.flux = np.array(flux, dtype=np.float64)[m]
+        self.ferr = np.array(ferr, dtype=np.float64)[m]
 
         # Normalize by the median.
-        if normalize:
-            mu = np.median(self.flux)
-            self.flux /= mu
-            self.ferr /= mu
+        mu = np.median(self.flux)
+        self.flux /= mu
+        self.ferr /= mu
+
+        # Loop over predictor light curves and interpolate over the missing
+        # data points in each one.
+        x = self.time
+        self.predictors = []
+        for pred in predictors:
+            y = np.array(pred, dtype=np.float64)[m]
+            bad = ~np.isfinite(y)
+            if np.any(bad):
+                y[bad] = np.interp(x[bad], x[~bad], y[~bad])
+            y /= np.median(y)
+            self.predictors.append(y)
+        self.predictors = np.vstack(self.predictors).T
 
     def __len__(self):
         return len(self.time)
 
-    def split(self, ts, normalize=True):
-        """
-        Split a light curve into a list of light curves at specified times.
-        All other properties of the light curve are "deepcopy"-ed.
-
-        :param ts:
-            The list of times where the light curve should be split.
-
-        :param normalize: (optional)
-            By default, the resulting light curves have independently
-            normalized fluxes and uncertainties. Set ``normalize=False`` to
-            retain the original values.
-
-        """
-        ts = np.concatenate([[-np.inf], np.sort(np.atleast_1d(ts)), [np.inf]])
-        datasets = []
-        for i, t0 in enumerate(ts[:-1]):
-            m = (np.isfinite(self.time) * (self.time >= t0)
-                 * (self.time < ts[i + 1]))
-            if np.any(m):
-                ds = copy.deepcopy(self)
-                ds.time = ds.time[m]
-                ds.flux = ds.flux[m]
-                ds.ferr = ds.ferr[m]
-                if normalize:
-                    mu = np.median(ds.flux)
-                    ds.flux /= mu
-                    ds.ferr /= mu
-                datasets.append(ds)
-
-        return datasets
-
-    def autosplit(self, ttol, max_length=None):
-        """
-        Automatically split a light curve at any time gaps longer than a fixed
-        tolerance.
-
-        :param ttol:
-            The maximum allowed gap length in days (the same units as the
-            ``time`` object).
-
-        :param max_length: (optional)
-            If provided this will spilt the resulting datasets in half until
-            they are all shorter than ``max_length``. This is probably only
-            useful for testing.
-
-        """
-        dt = self.time[1:] - self.time[:-1]
-        m = dt > ttol
-        ts = 0.5 * (self.time[1:][m] + self.time[:-1][m])
-        return self.split(ts)
-
     def median_detrend(self, dt=4.):
-        """
-        "De-trend" the light curve using a running windowed median.
-
-        :param dt: (optional)
-            The width of the median window in days. (default: 4)
-
-        """
         x, y = np.atleast_1d(self.time), np.atleast_1d(self.flux)
         assert len(x) == len(y)
         r = np.empty(len(y))
