@@ -23,7 +23,7 @@ class Inject(Pipeline):
         # Parse the arguments.
         injections = query["injections"]
         if not len(injections):
-            return dict(datasets=parent_response.datasets)
+            return dict(target_datasets=parent_response.target_datasets)
 
         # Build the system.
         q1 = query["q1"]
@@ -43,12 +43,12 @@ class Inject(Pipeline):
 
         # Inject the transit into each dataset.
         results = []
-        for _ in parent_response.datasets:
+        for _ in parent_response.target_datasets:
             lc = InjectedLightCurve(_)
             lc.flux[lc.m] *= s.light_curve(lc.time[lc.m])
             results.append(lc)
 
-        return dict(datasets=results, injected_system=s)
+        return dict(target_datasets=results, injected_system=s)
 
 
 class InjectedLightCurve(object):
@@ -65,6 +65,6 @@ class InjectedLightCurve(object):
         self.m = (np.isfinite(self.time) * np.isfinite(self.flux)
                   * np.isfinite(self.ferr))
 
-    def read(self):
+    def read(self, **kwargs):
         return dict(TIME=self.time, SAP_FLUX=self.flux, SAP_FLUX_ERR=self.ferr,
                     SAP_QUALITY=self.q)

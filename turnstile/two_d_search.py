@@ -19,7 +19,7 @@ class TwoDSearch(Pipeline):
         min_period=(None, True),
         max_period=(None, True),
         delta_log_period=(None, False),
-        dt=(0.1, False),
+        dt=(0.2, False),
         alpha=(np.log(60000)-np.log(2*np.pi), False)
     )
 

@@ -12,14 +12,14 @@ period, t0 = 295.963, 138.91
 # q = dict(kicid=3542566)
 # period, t0 = 325.03, 156.06
 
-# pipe = turnstile.Inject(pipe)
-# q["injections"] = [dict(radius=0.02, period=period, t0=t0)]
+pipe = turnstile.Inject(pipe)
+q["injections"] = [dict(radius=0.03, period=365., t0=15.)]
 
 pipe = turnstile.Prepare(pipe)
 pipe = turnstile.GPLikelihood(pipe)
 
 pipe = turnstile.OneDSearch(pipe)
-q["durations"] = 0.2
+q["durations"] = [0.2, 0.4, 0.6]
 
 pipe = turnstile.TwoDSearch(pipe, cache=False)
 q["min_period"] = 100
@@ -28,11 +28,16 @@ q["alpha"] = np.log(60000)-np.log(2*np.pi)
 
 response = pipe.query(**q)
 
-z1 = response.phic_same[:, :, 0]
+# print(response.injected_system.bodies[0].duration)
+
+# assert 0
+
+DURATION = 2
+z1 = response.phic_same[:, :, DURATION]
 z1[np.isnan(z1)] = -np.inf
-z2 = response.phic_variable[:, :, 0]
+z2 = response.phic_variable[:, :, DURATION]
 z2[np.isnan(z2)] = -np.inf
-depth = response.depth_2d[:, :, 0]
+depth = response.depth_2d[:, :, DURATION]
 depth[np.isnan(depth)] = 0.0
 
 z1[z2 > z1] = -np.inf
@@ -43,7 +48,7 @@ y = response.t0_2d
 for i in np.argsort(z1.flatten())[-10:]:
     xi, yi = np.unravel_index(i, z1.shape)
     period, t0 = periods[xi], y[yi]
-    print(period, t0, depth[xi, yi], response.depth_ivar_2d[xi, yi, 0])
+    print(period, t0, depth[xi, yi], response.depth_ivar_2d[xi, yi, DURATION])
 
 i = (np.arange(len(periods)), np.argmax(z1, axis=1))
 pl.plot(periods, z1[i], "k")
@@ -56,7 +61,7 @@ pl.savefig("periodogram-kic-{0}.png".format(q["kicid"]))
 times_1d = np.arange(response.min_time_1d, response.max_time_1d,
                      response.time_spacing)
 pl.clf()
-pl.plot(times_1d, response.dll_1d, "k")
+pl.plot(times_1d, response.dll_1d[:, DURATION], "k")
 # t = t0 + (period) * np.arange(9)
 # i = np.round((t - response.min_time_1d) / response.time_spacing).astype(int)
 # l = response.dll_1d[i] + 0.5 * np.log(response.depth_ivar_1d[i])
@@ -79,7 +84,7 @@ def time_warp(t):
 def model(t):
     t = time_warp(t)
     r = np.zeros_like(t)
-    r[np.fabs(t) < 0.5 * 0.2] = -1
+    r[np.fabs(t) < 0.5 * response.durations[DURATION]] = -1
     return r
 
 
