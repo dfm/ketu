@@ -1,0 +1,13 @@
+*.aux
+*.brf
+*.log
+*.out
+*.pdf
+*.bbl
+*.blg
+*.dvi
+*.ps
+*.synctex.gz
+!figures/*/*.pdf
+vc.tex
+referee_report.txt
