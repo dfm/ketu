@@ -113,6 +113,33 @@ stars: statistics
 
 \section{Introduction}
 
+\section{The noise model}
+
+The \kepler\ light curves are full of systematic effects, both astrophysical
+and instrumental.
+The standard method for dealing with these effects is to filter the data to
+remove these artifacts---presearch data conditioning (PDC), ARC, \etc\
+\dfmtodo{CITE}.
+This procedure will always \emph{overfit} and reduce the strength of the
+signals of interest.
+To deal with this, we simultaneously model the transit and the noise.
+
+There are a lot of physical effects involved in generating the noise and it
+would be computationally intractable to directly model them all.
+Instead, we use a flexible Gaussian process as an effective model.
+In this model, the likelihood of the data is given by
+\begin{eqnarray}
+\ln p(\bvec{y}\,|\,\bvec{\theta},\,\bvec{\alpha},\,\bvec{x}) &=&
+-\frac{1}{2} \left[ \bvec{y} - f_{\bvec{\theta}}(\bvec{x}) \right]^\mathrm{T}
+\, K_{\bvec{\alpha}}^{-1}(\bvec{x}) \,
+\left[ \bvec{y} - f_{\bvec{\theta}}(\bvec{x}) \right]
+-\frac{1}{2}\ln \det K_{\bvec{\alpha}}(\bvec{x}) - \frac{N}{2}\ln 2\,\pi
+\end{eqnarray}
+where $\bvec{y}$ is the observed light curve, $f_{\bvec{\theta}}(\bvec{x})$ is
+the transit model (parameterized by $\bvec{\theta}$), $\bvec{x}$ are the
+\emph{predictive features} (more on these later).
+
+
 \section{Discussion}
 
 All of the code used in this project is available from
