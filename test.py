@@ -19,7 +19,8 @@ pipe = turnstile.Prepare(pipe)
 pipe = turnstile.GPLikelihood(pipe)
 
 pipe = turnstile.OneDSearch(pipe)
-q["durations"] = [0.2, 0.4, 0.6]
+q["durations"] = [0.1]
+# q["durations"] = [0.2, 0.4, 0.6]
 
 pipe = turnstile.TwoDSearch(pipe, cache=False)
 q["min_period"] = 100
@@ -32,7 +33,7 @@ response = pipe.query(**q)
 
 # assert 0
 
-DURATION = 2
+DURATION = 0
 z1 = response.phic_same[:, :, DURATION]
 z1[np.isnan(z1)] = -np.inf
 z2 = response.phic_variable[:, :, DURATION]

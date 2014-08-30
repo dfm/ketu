@@ -8,8 +8,10 @@ import numpy as np
 from emcee.autocorr import integrated_time
 from scipy.linalg import cho_factor, cho_solve, LinAlgError
 
+import george
+from george.kernels import ExpSquaredKernel
+
 from .pipeline import Pipeline
-from ._gp import compute_kernel_matrix
 
 
 class GPLikelihood(Pipeline):
@@ -44,12 +46,13 @@ class LCWrapper(object):
              x[np.random.randint(len(x), size=10000)])
         self.ell = length_factor * np.mean(np.sum(d**2, axis=1))
 
-        # Build the kernel matrix.
-        self.K = compute_kernel_matrix(self.var, self.tau, self.time, self.ell,
-                                       x)
-        Kobs = np.array(self.K)
-        Kobs[np.diag_indices_from(Kobs)] += self.ferr ** 2
-        self.factor = cho_factor(Kobs, overwrite_a=True)
+        x = np.concatenate((np.atleast_2d(self.time).T, x), axis=1)
+        ndim = x.shape[1]
+
+        self.kernel = self.var * ExpSquaredKernel(self.ell, ndim) \
+            * ExpSquaredKernel(self.tau, ndim, dim=0)
+        self.gp = george.GP(self.kernel, solver=george.HODLRSolver)
+        self.gp.compute(x, self.ferr)
 
         # Compute the likelihood of the null model.
         self.ll0 = 0.0
@@ -65,9 +68,9 @@ class LCWrapper(object):
         mT = m.T
 
         # Precompute some useful factors.
-        Cf = cho_solve(self.factor, self.flux)
-        Cm = cho_solve(self.factor, m)
-        S = np.dot(mT, Cm)
+        Cf = self.gp.solver.apply_inverse(self.flux)
+        Cm = self.gp.solver.apply_inverse(m)
+        S = np.atleast_2d(np.dot(mT, Cm))
 
         # Solve for the maximum likelihood model.
         factor = cho_factor(S, overwrite_a=True)
@@ -81,7 +84,8 @@ class LCWrapper(object):
             w, m, sigma, Cf, Cm = self.linear_maximum_likelihood(model, order)
         except LinAlgError:
             w, m, sigma, Cf, Cm = self.linear_maximum_likelihood()
-        return np.dot(m, w) + np.dot(self.K, Cf - np.dot(Cm, w))
+        return np.dot(m, w) + np.dot(self.kernel.value(self.gp._x),
+                                     Cf - np.dot(Cm, w))
 
     def lnlike(self, model=None, order=2):
         try:
