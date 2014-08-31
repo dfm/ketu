@@ -27,7 +27,7 @@ class GPLikelihood(Pipeline):
 
 class LCWrapper(object):
 
-    def __init__(self, lc, length_factor=10):
+    def __init__(self, lc, dist_factor=10.0, time_factor=0.5):
         self.time = lc.time
         self.flux = lc.flux
         self.ferr = lc.ferr
@@ -37,20 +37,29 @@ class LCWrapper(object):
         self.flux = (self.flux - 1) * 1e6
         self.ferr *= 1e6
 
-        # Estimate the hyperparameters.
+        # Estimate the hyperparameters:
+        # (a) the variance:
         self.var = np.var(self.flux)
-        scale = np.median(np.diff(self.time)) * integrated_time(self.flux)
+
+        # (b) the time scale length:
+        scale = time_factor * np.median(np.diff(self.time)) \
+            * integrated_time(self.flux)
         self.tau = scale ** 2
+
+        # (c) the distance scale length:
         x = self.predictors
         d = (x[np.random.randint(len(x), size=10000)] -
              x[np.random.randint(len(x), size=10000)])
-        self.ell = length_factor * np.mean(np.sum(d**2, axis=1))
+        self.ell = dist_factor * np.mean(np.sum(d**2, axis=1))
 
+        # Include time as an input feature
         x = np.concatenate((np.atleast_2d(self.time).T, x), axis=1)
         ndim = x.shape[1]
 
-        self.kernel = self.var * ExpSquaredKernel(self.ell, ndim) \
-            * ExpSquaredKernel(self.tau, ndim, dim=0)
+        scale = np.append(self.tau, self.ell + np.zeros(ndim-1))
+        self.kernel = self.var * ExpSquaredKernel(scale, ndim)
+        # self.kernel = self.var * ExpSquaredKernel(self.ell, ndim) \
+        #     * ExpSquaredKernel(self.tau, ndim, dim=0)
         self.gp = george.GP(self.kernel, solver=george.HODLRSolver)
         self.gp.compute(x, self.ferr)
 
@@ -84,8 +93,16 @@ class LCWrapper(object):
             w, m, sigma, Cf, Cm = self.linear_maximum_likelihood(model, order)
         except LinAlgError:
             w, m, sigma, Cf, Cm = self.linear_maximum_likelihood()
-        return np.dot(m, w) + np.dot(self.kernel.value(self.gp._x),
-                                     Cf - np.dot(Cm, w))
+
+        if len(w) > 1:
+            sig = m[:, 0] * w[0]
+            bkg = m[:, 1] * w[1]
+        else:
+            bkg = m[:, 0] * w[0]
+            sig = np.zeros_like(bkg)
+
+        return sig, bkg + np.dot(self.kernel.value(self.gp._x),
+                                 Cf - np.dot(Cm, w))
 
     def lnlike(self, model=None, order=2):
         try:
