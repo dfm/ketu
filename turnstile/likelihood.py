@@ -27,7 +27,7 @@ class GPLikelihood(Pipeline):
 
 class LCWrapper(object):
 
-    def __init__(self, lc, dist_factor=10.0, time_factor=0.5):
+    def __init__(self, lc, dist_factor=10.0, time_factor=1.0):
         self.time = lc.time
         self.flux = lc.flux
         self.ferr = lc.ferr
@@ -56,7 +56,8 @@ class LCWrapper(object):
         x = np.concatenate((np.atleast_2d(self.time).T, x), axis=1)
         ndim = x.shape[1]
 
-        scale = np.append(self.tau, self.ell + np.zeros(ndim-1))
+        scale = np.append(1. / (1./self.tau + 1./self.ell),
+                          self.ell + np.zeros(ndim-1))
         self.kernel = self.var * ExpSquaredKernel(scale, ndim)
         # self.kernel = self.var * ExpSquaredKernel(self.ell, ndim) \
         #     * ExpSquaredKernel(self.tau, ndim, dim=0)

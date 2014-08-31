@@ -19,7 +19,7 @@ if "publish" in sys.argv[1:]:
 # Set up the extension.
 kwargs = dict(
     include_dirs=[numpy.get_include()],
-    extra_compile_args=["-Wno-unused-function", "-Wno-uninitialized"],
+    extra_compile_args=["-Wno-unused-function", ]  # "-Wno-uninitialized"],
 )
 exts = [
     Extension("turnstile._compute", sources=["turnstile/_compute.pyx"],

@@ -48,11 +48,10 @@ class TwoDSearch(Pipeline):
 
         results = grid_search(alpha, tmin, tmax, time_spacing, depth_1d,
                               depth_ivar_1d, dll_1d, periods, dt)
-        phic_same, phic_variable, depth_2d, depth_ivar_2d = results
+        t0_2d, phic_same, phic_variable, depth_2d, depth_ivar_2d = results
 
         return dict(
-            period_2d=periods,
-            t0_2d=np.arange(0, max(periods), dt) + tmin + mean_time,
+            period_2d=periods, t0_2d=t0_2d + tmin + mean_time,
             phic_same=phic_same, phic_variable=phic_variable,
             depth_2d=depth_2d, depth_ivar_2d=depth_ivar_2d,
         )

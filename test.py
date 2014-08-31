@@ -19,43 +19,45 @@ pipe = turnstile.Prepare(pipe)
 pipe = turnstile.GPLikelihood(pipe)
 
 pipe = turnstile.OneDSearch(pipe)
-q["durations"] = [0.2, 0.3]
+q["durations"] = [0.2]
 
-pipe = turnstile.TwoDSearch(pipe, cache=False)
+pipe = turnstile.TwoDSearch(pipe)
 q["min_period"] = 100
 q["max_period"] = 400
 q["alpha"] = np.log(60000)-np.log(2*np.pi)
 
 response = pipe.query(**q)
 
+# Reject some points.
 z1 = response.phic_same
-z1[np.isnan(z1)] = -np.inf
-dur_inds = np.argmax(z1, axis=2)
-print(dur_inds)
-assert 0
-
-z2 = response.phic_variable[:, :, DURATION]
-z2[np.isnan(z2)] = -np.inf
-depth = response.depth_2d[:, :, DURATION]
-depth[np.isnan(depth)] = 0.0
-
+z2 = response.phic_variable
+depths = response.depth_2d
+# depths[np.isnan(depths)] = 0.0
 # z1[z2 > z1] = -np.inf
-# z1[depth <= 0.0] = -np.inf
+# z1[depths <= 0.0] = -np.inf
 
-# periods = response.period_2d
-# y = response.t0_2d
-# for i in np.argsort(z1.flatten())[-10:]:
-#     xi, yi = np.unravel_index(i, z1.shape)
-#     period, t0 = periods[xi], y[yi]
-#     print(period, t0, depth[xi, yi], response.depth_ivar_2d[xi, yi, DURATION])
+# Find the profile over duration.
+DURATION = 0
+# dur_inds = np.argmax(z1, axis=2)
+z1 = z1[:, DURATION]
+z2 = z2[:, DURATION]
+depths = depths[:, DURATION]
 
-# i = (np.arange(len(periods)), np.argmax(z1, axis=1))
-# pl.plot(periods, z1[i], "k")
-# # pl.plot(periods, z2[i], "r")
-# pl.gca().axvline(period, color="r", lw=3, alpha=0.3)
-# pl.xlabel("period")
-# pl.ylabel("PHIC")
-# pl.savefig("periodogram-kic-{0}.png".format(q["kicid"]))
+periods = response.period_2d
+t0s = response.t0_2d[:, DURATION]
+i = np.argmax(z1)
+period, t0 = periods[i], t0s[i]
+duration = response.durations[DURATION]
+depth = depths[i]
+print(period, t0, duration, depth)
+
+pl.plot(periods, z1, "k")
+pl.plot(periods, z2, "r")
+pl.gca().axvline(period, color="r", lw=3, alpha=0.3)
+pl.xlabel("period")
+pl.ylabel("PHIC")
+pl.ylim(-100, 100)
+pl.savefig("periodogram-kic-{0}.png".format(q["kicid"]))
 
 # times_1d = np.arange(response.min_time_1d, response.max_time_1d,
 #                      response.time_spacing)
@@ -73,7 +75,7 @@ depth[np.isnan(depth)] = 0.0
 # pl.xlim(times_1d.min(), times_1d.max())
 # pl.savefig("dude.png")
 
-# # print(response.gp_light_curves[0])
+# print(response.gp_light_curves[0])
 
 
 def time_warp(t):
@@ -83,7 +85,7 @@ def time_warp(t):
 def model(t):
     t = time_warp(t)
     r = np.zeros_like(t)
-    r[np.fabs(t) < 0.5 * response.durations[DURATION]] = -1
+    r[np.fabs(t) < 0.5 * duration] = -1
     return r
 
 
