@@ -85,7 +85,7 @@ def time_warp(t):
 def model(t):
     t = time_warp(t)
     r = np.zeros_like(t)
-    r[np.fabs(t) < 0.5 * duration] = -1
+    r[np.fabs(t) < 0.5 * duration] = -depth
     return r
 
 
@@ -102,22 +102,24 @@ for lc in response.model_light_curves:
     m = (t < rng[1]) * (t > rng[0])
     if not np.any(m):
         continue
+    m = np.ones_like(t, dtype=bool)
     ind = np.argsort(t[m])
     t = t[m][ind]
     y = lc.flux[m][ind]
     mu = count*offset - np.median(y)
     ax1.plot(t, y + mu, ".k", ms=2)
 
-    mean, bkg = lc.predict(model)
+    mean, bkg = lc.predict(y=lc.flux - model(lc.time))
     ax1.plot(t, bkg[m][ind] + mu, "r")
-    ax1.plot(t, (mean + bkg)[m][ind] + mu, ":r")
+    ax1.plot(t, (model(lc.time) + bkg)[m][ind] + mu, ":r")
 
     ax2.plot(t, y - bkg[m][ind], ".k", ms=2)
 
     count += 1
 
-ax1.set_xlim(rng)
-ax2.set_xlim(rng)
+# ax1.set_xlim(rng)
+# ax2.set_xlim(rng)
+ax2.axhline(-depth, color="r", alpha=0.2, lw=3)
 # pl.ylim(-1000, 1000)
 fig1.savefig("data.png")
 fig2.savefig("data2.png")

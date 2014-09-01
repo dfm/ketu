@@ -27,11 +27,10 @@ class GPLikelihood(Pipeline):
 
 class LCWrapper(object):
 
-    def __init__(self, lc, dist_factor=10.0, time_factor=1.0):
+    def __init__(self, lc, dist_factor=10.0, time_factor=0.1):
         self.time = lc.time
         self.flux = lc.flux
         self.ferr = lc.ferr
-        self.predictors = lc.predictors - 1
 
         # Convert to PPM.
         self.flux = (self.flux - 1) * 1e6
@@ -42,12 +41,11 @@ class LCWrapper(object):
         self.var = np.var(self.flux)
 
         # (b) the time scale length:
-        scale = time_factor * np.median(np.diff(self.time)) \
-            * integrated_time(self.flux)
-        self.tau = scale ** 2
+        self.tau = time_factor * (np.median(np.diff(self.time))
+                                  * integrated_time(self.flux)) ** 2
 
         # (c) the distance scale length:
-        x = self.predictors
+        x = lc.predictors - 1
         d = (x[np.random.randint(len(x), size=10000)] -
              x[np.random.randint(len(x), size=10000)])
         self.ell = dist_factor * np.mean(np.sum(d**2, axis=1))
@@ -56,8 +54,8 @@ class LCWrapper(object):
         x = np.concatenate((np.atleast_2d(self.time).T, x), axis=1)
         ndim = x.shape[1]
 
-        scale = np.append(1. / (1./self.tau + 1./self.ell),
-                          self.ell + np.zeros(ndim-1))
+        # print(self.tau, 1. / (time_factor/(self.tau) + 1./self.ell))
+        scale = np.append(self.tau, self.ell + np.zeros(ndim-1))
         self.kernel = self.var * ExpSquaredKernel(scale, ndim)
         # self.kernel = self.var * ExpSquaredKernel(self.ell, ndim) \
         #     * ExpSquaredKernel(self.tau, ndim, dim=0)
@@ -68,7 +66,10 @@ class LCWrapper(object):
         self.ll0 = 0.0
         self.ll0, _, _ = self.lnlike(order=1)
 
-    def linear_maximum_likelihood(self, model=None, order=2):
+    def linear_maximum_likelihood(self, model=None, order=2, y=None):
+        if y is None:
+            y = self.flux
+
         if model is None:
             model = np.zeros_like(self.time)
             order = 1
@@ -78,7 +79,7 @@ class LCWrapper(object):
         mT = m.T
 
         # Precompute some useful factors.
-        Cf = self.gp.solver.apply_inverse(self.flux)
+        Cf = self.gp.solver.apply_inverse(y)
         Cm = self.gp.solver.apply_inverse(m)
         S = np.atleast_2d(np.dot(mT, Cm))
 
@@ -89,11 +90,12 @@ class LCWrapper(object):
 
         return w, m, sigma, Cf, Cm
 
-    def predict(self, model=None, order=2):
+    def predict(self, model=None, order=2, y=None):
         try:
-            w, m, sigma, Cf, Cm = self.linear_maximum_likelihood(model, order)
+            w, m, sigma, Cf, Cm = \
+                self.linear_maximum_likelihood(model, order, y=y)
         except LinAlgError:
-            w, m, sigma, Cf, Cm = self.linear_maximum_likelihood()
+            w, m, sigma, Cf, Cm = self.linear_maximum_likelihood(y=y)
 
         if len(w) > 1:
             sig = m[:, 0] * w[0]
