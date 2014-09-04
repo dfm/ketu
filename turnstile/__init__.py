@@ -3,13 +3,14 @@
 __version__ = "0.1.0"
 
 try:
-    __TURNSTILE_SETUP__
+    __TURNSTILE_SETUP__  # NOQA
 except NameError:
     __TURNSTILE_SETUP__ = False
 
 if not __TURNSTILE_SETUP__:
     __all__ = ["Pipeline", "Download", "Inject", "Prepare", "Detrend",
-               "GPLikelihood", "OneDSearch", "TwoDSearch", "PeakDetect"]
+               "GPLikelihood", "OneDSearch", "TwoDSearch", "PeakDetect",
+               "FeatureExtract"]
 
     from .pipeline import Pipeline
     from .download import Download
@@ -20,3 +21,4 @@ if not __TURNSTILE_SETUP__:
     from .one_d_search import OneDSearch
     from .two_d_search import TwoDSearch
     from .peak_detect import PeakDetect
+    from .feature_extract import FeatureExtract

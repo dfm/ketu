@@ -8,7 +8,6 @@ import os
 import h5py
 import logging
 import numpy as np
-from itertools import izip
 
 from .pipeline import Pipeline
 
@@ -53,7 +52,7 @@ class PeakDetect(Pipeline):
         ttot = tmx - tmn
         periods = parent_response.period_2d
 
-        # Do a linear fit of the form: sqrt(N / P)
+        # Do a linear fit of the form: sqrt(N / P).
         bkg = np.vstack((
             np.sqrt(np.ceil(ttot / periods)) / np.sqrt(periods),
             np.ones_like(periods),
@@ -83,7 +82,8 @@ class PeakDetect(Pipeline):
                 p1, t1 = periods[j], t0s[j]
                 n = max(n, count_overlapping_transits(p1, t1, p2, t2, tmn, tmx,
                                                       max(duration[i],
-                                                          duration[j]) + 0.1))
+                                                          duration[j])
+                                                      + overlap_tol))
             if n <= max_overlap:
                 accepted_peaks[npeak] = i
                 npeak += 1
@@ -110,37 +110,40 @@ class PeakDetect(Pipeline):
             peaks=peaks,
         )
 
-    # def save_to_cache(self, fn, response):
-    #     try:
-    #         os.makedirs(os.path.dirname(fn))
-    #     except os.error:
-    #         pass
-    #     with h5py.File(fn, "w") as f:
-    #         f.create_dataset("period_2d", data=response["period_2d"],
-    #                          compression="gzip")
-    #         f.create_dataset("t0_2d", data=response["t0_2d"],
-    #                          compression="gzip")
-    #         f.create_dataset("phic_same", data=response["phic_same"],
-    #                          compression="gzip")
-    #         f.create_dataset("phic_variable", data=response["phic_variable"],
-    #                          compression="gzip")
-    #         f.create_dataset("depth_2d", data=response["depth_2d"],
-    #                          compression="gzip")
-    #         f.create_dataset("depth_ivar_2d", data=response["depth_ivar_2d"],
-    #                          compression="gzip")
+    def save_to_cache(self, fn, response):
+        try:
+            os.makedirs(os.path.dirname(fn))
+        except os.error:
+            pass
 
-    # def load_from_cache(self, fn):
-    #     if os.path.exists(fn):
-    #         with h5py.File(fn, "r") as f:
-    #             try:
-    #                 return dict(
-    #                     period_2d=f["period_2d"][...],
-    #                     t0_2d=f["t0_2d"][...],
-    #                     phic_same=f["phic_same"][...],
-    #                     phic_variable=f["phic_variable"][...],
-    #                     depth_2d=f["depth_2d"][...],
-    #                     depth_ivar_2d=f["depth_ivar_2d"][...],
-    #                 )
-    #             except KeyError:
-    #                 pass
-    #     return None
+        # Parse the peaks into a structured array.
+        peaks = response["peaks"]
+        if len(peaks):
+            dtype = [(k, np.float64) for k in sorted(peaks[0].keys())]
+            peaks = [tuple(peak[k] for k, _ in dtype) for peak in peaks]
+            peaks = np.array(peaks, dtype=dtype)
+
+        with h5py.File(fn, "w") as f:
+            f.attrs["rms"] = response["rms"]
+            f.create_dataset("periods", data=response["periods"],
+                             compression="gzip")
+            f.create_dataset("scaled_phic_same",
+                             data=response["scaled_phic_same"],
+                             compression="gzip")
+            f.create_dataset("peaks", data=peaks, compression="gzip")
+
+    def load_from_cache(self, fn):
+        if os.path.exists(fn):
+            with h5py.File(fn, "r") as f:
+                try:
+                    peaks = [dict((k, peak[k]) for k in peak.dtype.names)
+                             for peak in f["peaks"]]
+                    return dict(
+                        periods=f["periods"][...],
+                        scaled_phic_same=f["scaled_phic_same"][...],
+                        rms=f.attrs["rms"],
+                        peaks=peaks,
+                    )
+                except KeyError:
+                    pass
+        return None
