@@ -19,20 +19,27 @@ class TwoDSearch(Pipeline):
         min_period=(None, True),
         max_period=(None, True),
         delta_log_period=(None, False),
-        dt=(0.2, False),
+        dt=(None, False),
         alpha=(np.log(60000)-np.log(2*np.pi), False)
     )
 
     def get_period_grid(self, query, parent_response):
         delta_log_period = query.get("delta_log_period", None)
         if delta_log_period is None:
-            delta_log_period = 0.1*np.min(parent_response.durations)/(4.1*365.)
+            ttot = parent_response.max_time_1d - parent_response.min_time_1d
+            delta_log_period = 0.3*np.min(parent_response.durations)/ttot
         lpmin, lpmax = np.log(query["min_period"]), np.log(query["max_period"])
         return np.exp(np.arange(lpmin, lpmax, delta_log_period))
 
+    def get_offset_spacing(self, query, parent_response):
+        dt = query.get("dt", None)
+        if dt is None:
+            dt = 0.5 * np.min(parent_response.durations)
+        return float(dt)
+
     def get_result(self, query, parent_response):
         periods = self.get_period_grid(query, parent_response)
-        dt = float(query["dt"])
+        dt = self.get_offset_spacing(query, parent_response)
         alpha = float(query["alpha"])
 
         # Get the parameters of the time grid from the 1-d search.
@@ -51,7 +58,8 @@ class TwoDSearch(Pipeline):
         t0_2d, phic_same, phic_variable, depth_2d, depth_ivar_2d = results
 
         return dict(
-            period_2d=periods, t0_2d=t0_2d + tmin + mean_time,
+            period_2d=periods,
+            t0_2d=(t0_2d + tmin + mean_time) % periods[:, None],
             phic_same=phic_same, phic_variable=phic_variable,
             depth_2d=depth_2d, depth_ivar_2d=depth_ivar_2d,
         )

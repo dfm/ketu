@@ -29,12 +29,8 @@ class LCWrapper(object):
 
     def __init__(self, lc, dist_factor=10.0, time_factor=0.1):
         self.time = lc.time
-        self.flux = lc.flux
+        self.flux = lc.flux - 1.0
         self.ferr = lc.ferr
-
-        # Convert to PPM.
-        self.flux = (self.flux - 1) * 1e6
-        self.ferr *= 1e6
 
         # Estimate the hyperparameters:
         # (a) the variance:
@@ -54,11 +50,8 @@ class LCWrapper(object):
         x = np.concatenate((np.atleast_2d(self.time).T, x), axis=1)
         ndim = x.shape[1]
 
-        # print(self.tau, 1. / (time_factor/(self.tau) + 1./self.ell))
         scale = np.append(self.tau, self.ell + np.zeros(ndim-1))
         self.kernel = self.var * ExpSquaredKernel(scale, ndim)
-        # self.kernel = self.var * ExpSquaredKernel(self.ell, ndim) \
-        #     * ExpSquaredKernel(self.tau, ndim, dim=0)
         self.gp = george.GP(self.kernel, solver=george.HODLRSolver)
         self.gp.compute(x, self.ferr)
 

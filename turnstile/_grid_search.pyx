@@ -2,7 +2,7 @@ from __future__ import division
 
 cimport cython
 from libc.stdlib cimport malloc, free
-from libc.math cimport fabs, fmod, floor, ceil, round, log, M_PI
+from libc.math cimport ceil, round, log, INFINITY
 
 import numpy as np
 cimport numpy as np
@@ -11,17 +11,16 @@ DTYPE = np.float64
 ctypedef np.float64_t DTYPE_t
 
 
+@cython.boundscheck(False)
 cdef int evaluate_single(double alpha, double period, double t0,
                          double tmin, double tmax, double time_spacing,
                          int nduration, double* dll_1d,
-                         double* depth_1d, double* depth_ivar_1d,
+                         const double* depth_1d, const double* depth_ivar_1d,
                          double* phic_variable, double* phic_same,
-                         double* depth_2d, double* depth_ivar_2d):
+                         double* depth_2d, double* depth_ivar_2d,
+                         int* inds):
     # MAGIC!
-    cdef int k, ind
-    cdef double CONST = -0.5*log(2*M_PI)
-    cdef int nind, nimx = int(ceil((tmax - tmin) / period))
-    cdef int* inds = <int*>malloc(nimx * sizeof(int))
+    cdef int k, ind, nind
 
     # Initialize the results array at zero.
     for k in range(nduration):
@@ -56,7 +55,7 @@ cdef int evaluate_single(double alpha, double period, double t0,
             phic_variable[k] += dll_1d[ind]
 
             # And then the uncertainty in the depth measurement.
-            phic_variable[k] += 0.5*log(depth_ivar_1d[ind]) + CONST
+            phic_variable[k] += 0.5*log(depth_ivar_1d[ind])
 
             # Here, we'll accumulate the weighted depth
             # measurement for the single depth model.
@@ -91,9 +90,8 @@ cdef int evaluate_single(double alpha, double period, double t0,
         else:
             depth_2d[k] = 0.0
             depth_ivar_2d[k] = 0.0
-            phic_same[k] = -np.inf
+            phic_same[k] = -INFINITY
 
-    free(inds)
     return nind
 
 
@@ -106,15 +104,12 @@ def grid_search(double alpha,
                 np.ndarray[DTYPE_t, ndim=1] periods,
                 double dt):
 
-    cdef double t0, t, period, d
-    cdef int i, j, k, l, ind, offset
+    cdef double t0, period
+    cdef int i, k
 
     # Array dimensions.
     cdef int nperiod = periods.shape[0]
     cdef int nduration = dll_1d.shape[1]
-
-    # The maximum number of phase points.
-    cdef int ntmx = int(ceil(periods.max() / dt))
 
     # Allocate the output arrays.
     cdef np.ndarray[DTYPE_t, ndim=2] phic_same = \
@@ -139,6 +134,10 @@ def grid_search(double alpha,
     cdef double* depth_1d_data = <double*>depth_1d.data,
     cdef double* depth_ivar_1d_data = <double*>depth_ivar_1d.data,
 
+    # Workspace for the transit indices.
+    cdef int nimx = int(ceil((tmax - tmin) / periods.min()))
+    cdef int* inds = <int*>malloc(nimx * sizeof(int))
+
     # Loop over hypothesized periods.
     for i in range(nperiod):
         period = periods[i]
@@ -150,7 +149,7 @@ def grid_search(double alpha,
                             nduration, dll_1d_data, depth_1d_data,
                             depth_ivar_1d_data,
                             phic_variable_tmp, phic_same_tmp, depth_2d_tmp,
-                            depth_ivar_2d_tmp)
+                            depth_ivar_2d_tmp, inds)
 
             # Loop over durations and decide if this should be accepted.
             for k in range(nduration):
@@ -172,5 +171,6 @@ def grid_search(double alpha,
     free(phic_variable_tmp)
     free(depth_2d_tmp)
     free(depth_ivar_2d_tmp)
+    free(inds)
 
     return phases_2d, phic_same, phic_variable, depth_2d, depth_ivar_2d

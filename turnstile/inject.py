@@ -4,6 +4,7 @@ from __future__ import division, print_function, unicode_literals
 
 __all__ = ["Inject", "InjectedLightCurve"]
 
+import logging
 import transit
 import numpy as np
 from .pipeline import Pipeline
@@ -40,6 +41,11 @@ class Inject(Pipeline):
                                 e=inj.get("e", 0.0),
                                 pomega=inj.get("pomega", 0.0))
             s.add_body(body)
+            try:
+                body.ix
+            except ValueError:
+                logging.warn("Removing planet with invalid impact parameter")
+                s.bodies.pop()
 
         # Inject the transit into each dataset.
         results = []
