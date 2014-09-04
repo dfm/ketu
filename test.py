@@ -21,7 +21,7 @@ period, t0 = 295.963, 138.91
 # q = dict(kicid=2860283)
 
 pipe = turnstile.Inject(pipe)
-q["injections"] = [dict(radius=0.015, period=125., t0=12.)]
+q["injections"] = [dict(radius=0.015, period=25., t0=12.)]
 
 pipe = turnstile.Prepare(pipe)
 pipe = turnstile.GPLikelihood(pipe)

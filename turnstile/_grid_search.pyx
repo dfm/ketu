@@ -114,14 +114,16 @@ def grid_search(double alpha,
     # Allocate the output arrays.
     cdef np.ndarray[DTYPE_t, ndim=2] phic_same = \
             -np.inf + np.zeros((nperiod, nduration), dtype=DTYPE)
+    cdef np.ndarray[DTYPE_t, ndim=2] phic_same_2 = \
+            -np.inf + np.zeros((nperiod, nduration), dtype=DTYPE)
     cdef np.ndarray[DTYPE_t, ndim=2] phic_variable = \
-            np.empty((nperiod, nduration), dtype=DTYPE)
+            -np.inf + np.zeros((nperiod, nduration), dtype=DTYPE)
     cdef np.ndarray[DTYPE_t, ndim=2] depth_2d = \
-            np.empty((nperiod, nduration), dtype=DTYPE)
+            np.zeros((nperiod, nduration), dtype=DTYPE)
     cdef np.ndarray[DTYPE_t, ndim=2] depth_ivar_2d = \
-            np.empty((nperiod, nduration), dtype=DTYPE)
+            np.zeros((nperiod, nduration), dtype=DTYPE)
     cdef np.ndarray[DTYPE_t, ndim=2] phases_2d = \
-            np.empty((nperiod, nduration), dtype=DTYPE)
+            np.zeros((nperiod, nduration), dtype=DTYPE)
 
     # Temporary arrays.
     cdef double* phic_same_tmp = <double*>malloc(nduration * sizeof(double))
@@ -154,13 +156,16 @@ def grid_search(double alpha,
             # Loop over durations and decide if this should be accepted.
             for k in range(nduration):
                 if (depth_2d_tmp[k] > 0.0 and
-                        phic_same_tmp[k] > phic_variable_tmp[k] and
-                        phic_same_tmp[k] > phic_same[i, k]):
-                    phic_same[i, k] = phic_same_tmp[k]
-                    phic_variable[i, k] = phic_variable_tmp[k]
-                    depth_2d[i, k] = depth_2d_tmp[k]
-                    depth_ivar_2d[i, k] = depth_ivar_2d_tmp[k]
-                    phases_2d[i, k] = t0
+                        phic_same_tmp[k] > phic_variable_tmp[k]):
+                    if phic_same_tmp[k] > phic_same[i, k]:
+                        phic_same_2[i, k] = phic_same[i, k]
+                        phic_same[i, k] = phic_same_tmp[k]
+                        phic_variable[i, k] = phic_variable_tmp[k]
+                        depth_2d[i, k] = depth_2d_tmp[k]
+                        depth_ivar_2d[i, k] = depth_ivar_2d_tmp[k]
+                        phases_2d[i, k] = t0
+                    elif phic_same_tmp[k] > phic_same_2[i, k]:
+                        phic_same_2[i, k] = phic_same_tmp[k]
 
             # Update the proposal time.
             t0 += dt
@@ -173,4 +178,5 @@ def grid_search(double alpha,
     free(depth_ivar_2d_tmp)
     free(inds)
 
-    return phases_2d, phic_same, phic_variable, depth_2d, depth_ivar_2d
+    return (phases_2d, phic_same, phic_same_2, phic_variable,
+            depth_2d, depth_ivar_2d)

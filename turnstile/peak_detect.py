@@ -41,6 +41,7 @@ class PeakDetect(Pipeline):
         dur_ind = np.arange(len(phic_same)), np.argmax(phic_same, axis=1)
         phic_same = phic_same[dur_ind]
 
+        phic_same_2 = parent_response.phic_same_2[dur_ind]
         phic_variable = parent_response.phic_variable[dur_ind]
         t0s = parent_response.t0_2d[dur_ind]
         depth = parent_response.depth_2d[dur_ind]
@@ -95,6 +96,7 @@ class PeakDetect(Pipeline):
 
         peaks = [dict(
             period=periods[i], t0=t0s[i], phic_same=phic_same[i],
+            delta_phic=phic_same[i] - phic_same_2[i],
             phic_variable=phic_variable[i], scaled_phic_same=z[i],
             depth=depth[i], depth_ivar=depth_ivar[i],
             depth_s2n=depth[i]*np.sqrt(depth_ivar[i]), rms=rms,

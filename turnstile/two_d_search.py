@@ -55,12 +55,14 @@ class TwoDSearch(Pipeline):
 
         results = grid_search(alpha, tmin, tmax, time_spacing, depth_1d,
                               depth_ivar_1d, dll_1d, periods, dt)
-        t0_2d, phic_same, phic_variable, depth_2d, depth_ivar_2d = results
+        t0_2d, phic_same, phic_same_2, phic_variable, depth_2d, depth_ivar_2d \
+            = results
 
         return dict(
             period_2d=periods,
             t0_2d=(t0_2d + tmin + mean_time) % periods[:, None],
-            phic_same=phic_same, phic_variable=phic_variable,
+            phic_same=phic_same, phic_same_2=phic_same_2,
+            phic_variable=phic_variable,
             depth_2d=depth_2d, depth_ivar_2d=depth_ivar_2d,
         )
 
@@ -75,6 +77,8 @@ class TwoDSearch(Pipeline):
             f.create_dataset("t0_2d", data=response["t0_2d"],
                              compression="gzip")
             f.create_dataset("phic_same", data=response["phic_same"],
+                             compression="gzip")
+            f.create_dataset("phic_same_2", data=response["phic_same_2"],
                              compression="gzip")
             f.create_dataset("phic_variable", data=response["phic_variable"],
                              compression="gzip")
@@ -91,6 +95,7 @@ class TwoDSearch(Pipeline):
                         period_2d=f["period_2d"][...],
                         t0_2d=f["t0_2d"][...],
                         phic_same=f["phic_same"][...],
+                        phic_same_2=f["phic_same_2"][...],
                         phic_variable=f["phic_variable"][...],
                         depth_2d=f["depth_2d"][...],
                         depth_ivar_2d=f["depth_ivar_2d"][...],
