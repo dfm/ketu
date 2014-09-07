@@ -13,6 +13,10 @@ from functools import partial
 from .pipeline import Pipeline
 
 
+def prepare_download(query, parent_response):
+    pass
+
+
 class Download(Pipeline):
 
     query_parameters = {
