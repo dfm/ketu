@@ -10,7 +10,7 @@ except NameError:
 if not __TURNSTILE_SETUP__:
     __all__ = ["Pipeline", "Download", "Inject", "Prepare", "Detrend",
                "GPLikelihood", "OneDSearch", "TwoDSearch", "PeakDetect",
-               "FeatureExtract"]
+               "FeatureExtract", "Validate"]
 
     from .pipeline import Pipeline
     from .download import Download
@@ -22,3 +22,4 @@ if not __TURNSTILE_SETUP__:
     from .two_d_search import TwoDSearch
     from .peak_detect import PeakDetect
     from .feature_extract import FeatureExtract
+    from .dv import Validate

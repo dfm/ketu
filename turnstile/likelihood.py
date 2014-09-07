@@ -32,6 +32,10 @@ class LCWrapper(object):
         self.flux = lc.flux - 1.0
         self.ferr = lc.ferr
 
+        # Convert to parts per thousand.
+        self.flux *= 1e3
+        self.ferr *= 1e3
+
         # Estimate the hyperparameters:
         # (a) the variance:
         self.var = np.var(self.flux)

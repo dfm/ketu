@@ -21,6 +21,11 @@ def count_overlapping_transits(p1, t1, p2, t2, tmn, tmx, tol):
     return np.sum(delta < tol)
 
 
+def compute_curvature(z, p, i):
+    a = np.vander(p[i-1:i+2], 3)
+    return np.linalg.solve(a, z[i-1:i+2])[0]
+
+
 class PeakDetect(Pipeline):
 
     cache_ext = ".h5"
@@ -97,6 +102,7 @@ class PeakDetect(Pipeline):
         peaks = [dict(
             period=periods[i], t0=t0s[i], phic_same=phic_same[i],
             delta_phic=phic_same[i] - phic_same_2[i],
+            curve_phic=compute_curvature(z, periods, i),
             phic_variable=phic_variable[i], scaled_phic_same=z[i],
             depth=depth[i], depth_ivar=depth_ivar[i],
             depth_s2n=depth[i]*np.sqrt(depth_ivar[i]), rms=rms,

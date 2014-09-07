@@ -140,7 +140,7 @@ class PipelineResult(object):
                 self.pipeline_element.parent.query(**(self.query))
         return self._parent_response
 
-    def __getattr__(self, k):
+    def __getitem__(self, k):
         if k in self.response:
             return self.response[k]
         if k in self.query:
@@ -161,4 +161,10 @@ class PipelineResult(object):
                                      .format(k))
             return v
 
-        return getattr(self.parent_response, k)
+        raise KeyError(k)
+
+    def __getattr__(self, k):
+        try:
+            return self[k]
+        except KeyError:
+            return getattr(self.parent_response, k)

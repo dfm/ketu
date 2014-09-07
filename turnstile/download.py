@@ -4,8 +4,12 @@ from __future__ import division, print_function, unicode_literals
 
 __all__ = ["Download"]
 
+import os
 import sys
 import kplr
+import tarfile
+from functools import partial
+
 from .pipeline import Pipeline
 
 
@@ -13,7 +17,7 @@ class Download(Pipeline):
 
     query_parameters = {
         "kicid": (None, True),
-        "tarfile_root": (None, True),
+        "tarball_root": (None, True),
         "data_root": (None, True),
         "short_cadence": (False, False),
         "npredictor": (50, False),
@@ -50,13 +54,28 @@ class Download(Pipeline):
 
         # Work out all of the KIC IDs that we'll touch.
         kicids = (set("{0:09d}".format(int(kicid)))
-                  & set(lc.kicid for quarter in predictor_lcs
+                  | set(lc.kepid for quarter in predictor_lcs
                         for lc in quarter))
-        print(kicids)
+
+        # Extract the relevant tarfiles.
+        map(partial(self._extract_light_curves, query["tarball_root"],
+                    os.path.join(query["data_root"], "data")),
+            kicids)
+
+        #
+        print([lc.cache_exists for lc in data])
+        print(len([lc.cache_exists for quarter in predictor_lcs for lc in quarter]))
         assert 0
 
         return dict(star=kic, target_datasets=data,
                     predictor_datasets=predictor_lcs)
 
-    def _extract_light_curves(self, kicid, tarfile_root):
-        pass
+    def _extract_light_curves(self, tarball_root, data_root, kicid):
+        tarball = os.path.join(tarball_root, kicid + ".tar.gz")
+        try:
+            with tarfile.open(tarball, "r") as f:
+                f.extractall(data_root)
+        except:
+            print("fail: ", tarball)
+        else:
+            print("success: ", tarball)
