@@ -1,6 +1,20 @@
 import os
 import turnstile
 
+
+fn = "blahface/download.pkl"
+# archive_root = "/export/bbq1/dfm/kplr/data/lightcurves"
+# data_root = "blahface"
+# kicid = 1724842
+# turnstile.PreparedDownload.prepare(fn, archive_root, data_root, kicid)
+
+pipe = turnstile.PreparedDownload()
+q = dict(prepared_file=fn)
+
+result = pipe.query(**q)
+print(result.target_datasets[0].cache_exists)
+
+assert 0
 pipe = turnstile.Download()
 # q = dict(kicid=8644545)
 # period, t0 = 295.963, 138.91
@@ -8,8 +22,6 @@ pipe = turnstile.Download()
 # Petigura failures.
 q = dict(
     kicid=1724842,
-    tarball_root="/export/bbq1/dfm/kplr/data/tarballs",
-    data_root="blahface",
 )
 # q = dict(kicid=1570270)
 
