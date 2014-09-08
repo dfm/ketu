@@ -13,3 +13,4 @@ dist
 *.c
 build
 scripts/turnstile.o*
+runs
