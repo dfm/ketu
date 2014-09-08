@@ -55,8 +55,7 @@ class Validate(Pipeline):
         super(Validate, self).__init__(*args, **kwargs)
 
     def get_result(self, query, parent_response):
-        bp = os.path.join(query["validation_path"],
-                          "{0}".format(parent_response.kicid))
+        bp = query["validation_path"]
         try:
             os.makedirs(bp)
         except os.error:

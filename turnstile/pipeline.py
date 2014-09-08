@@ -32,11 +32,14 @@ class Pipeline(object):
         for k, v in kwargs.iteritems():
             self.query_parameter[k] = (v, False)
 
-        from . import __version__
         if basepath is None:
-            basepath = os.path.join(os.path.abspath(os.path.expanduser(
-                os.environ.get("TURNSTILE_PATH", "~/.turnstile"))),
-                __version__)
+            if parent is None:
+                from . import __version__
+                basepath = os.path.join(os.path.abspath(os.path.expanduser(
+                    os.environ.get("TURNSTILE_PATH", "~/.turnstile"))),
+                    __version__)
+            else:
+                basepath = parent.basepath
         self.basepath = basepath
 
     def get_arg(self, k, kwargs):
@@ -72,8 +75,11 @@ class Pipeline(object):
         if self.parent is not None:
             q = dict(q, **(self.parent.get_key(**kwargs)[1]))
 
-        return hashlib.sha1(json.dumps([self.get_id(), q],
-                                       sort_keys=True)).hexdigest(), q
+        key = hashlib.sha1(json.dumps([self.get_id(), q],
+                                      sort_keys=True)).hexdigest()
+        if "kicid" in kwargs:
+            key = "{0}-{1}".format(kwargs["kicid"], key)
+        return key, q
 
     def save_to_cache(self, fn, response):
         try:

@@ -68,12 +68,15 @@ class Download(Pipeline):
 class PreparedDownload(Pipeline):
 
     query_parameters = dict(
+        kicid=(None, True),
         prepared_file=(None, True),
     )
 
     def get_result(self, query, parent_response):
         with open(query["prepared_file"], "rb") as f:
             kic, data, predictor_lcs = pickle.load(f)
+        assert int(query["kicid"]) == int(kic.kepid), \
+            "Invalid prepared download."
         return dict(star=kic, target_datasets=data,
                     predictor_datasets=predictor_lcs)
 
@@ -101,13 +104,3 @@ class PreparedDownload(Pipeline):
         # Save the prepared listing.
         with open(outfn, "wb") as f:
             pickle.dump((kic, data, predictor_lcs), f, -1)
-
-    def _extract_light_curves(self, tarball_root, data_root, kicid):
-        tarball = os.path.join(tarball_root, kicid + ".tar.gz")
-        try:
-            with tarfile.open(tarball, "r") as f:
-                f.extractall(data_root)
-        except:
-            print("fail: ", tarball)
-        else:
-            print("success: ", tarball)

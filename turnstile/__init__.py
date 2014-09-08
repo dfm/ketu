@@ -9,9 +9,8 @@ except NameError:
 
 if not __TURNSTILE_SETUP__:
     __all__ = ["Pipeline", "Download", "PreparedDownload", "Inject",
-               "Prepare", "Detrend",
-               "GPLikelihood", "OneDSearch", "TwoDSearch", "PeakDetect",
-               "FeatureExtract", "Validate"]
+               "Prepare", "Detrend", "GPLikelihood", "OneDSearch",
+               "TwoDSearch", "PeakDetect", "FeatureExtract", "Validate"]
 
     from .pipeline import Pipeline
     from .download import Download, PreparedDownload
