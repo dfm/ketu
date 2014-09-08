@@ -29,14 +29,14 @@ class FeatureExtract(Pipeline):
         lc_window_width=(3.0, False),
         bins=(32, False),
         period_tol=(0.2, False),
-        t0_tol=(0.2, False),
+        t0_tol=(None, False),
     )
 
     def get_result(self, query, parent_response):
         bins = float(query["bins"])
         dt = 0.5 * float(query["lc_window_width"])
         period_tol = float(query["period_tol"])
-        t0_tol = float(query["period_tol"])
+        t0_tol_0 = query["t0_tol"]
 
         # Get the list of injections...
         injections = query.get("injections", [])
@@ -120,6 +120,7 @@ class FeatureExtract(Pipeline):
 
             # Check if this is an injection.
             peak["is_injection"] = False
+            t0_tol = 1.5 * duration if t0_tol_0 is None else t0_tol_0
             for i, row in enumerate(inj_rec):
                 if (np.fabs(row["period"] - period) > period_tol
                         or np.fabs(row["t0"] - t0) > t0_tol):

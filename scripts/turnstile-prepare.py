@@ -13,6 +13,10 @@ from scipy.stats import beta
 
 def prepare(kicid, archive_root, data_root, results_root, injections=None,
             durations=[0.2, 0.4, 0.6], min_period=50, max_period=400):
+    archive_root = os.path.abspath(archive_root)
+    data_root = os.path.abspath(data_root)
+    results_root = os.path.abspath(results_root)
+
     try:
         os.makedirs(results_root)
     except os.error:
@@ -43,8 +47,11 @@ def prepare(kicid, archive_root, data_root, results_root, injections=None,
 
     pipe = turnstile.Prepare(pipe, cache=False)
     pipe = turnstile.GPLikelihood(pipe, cache=False)
-    pipe = turnstile.OneDSearch(pipe)
+    pipe = turnstile.OneDSearch(pipe, clobber=True)
     pipe = turnstile.TwoDSearch(pipe, cache=False)
+    pipe = turnstile.PeakDetect(pipe, cache=False)
+    pipe = turnstile.FeatureExtract(pipe, cache=False)
+    pipe = turnstile.Validate(pipe, cache=False)
 
     pkl_fn = os.path.join(results_root, "pipeline.pkl")
     with open(pkl_fn, "wb") as f:
@@ -71,6 +78,23 @@ def generate_system(K, mstar=1.0, rstar=1.0, min_period=50., max_period=400.):
     return dict(q1=q1, q2=q2, mstar=mstar, rstar=rstar,
                 injections=[dict(zip(labels, _))
                             for _ in zip(periods, t0s, radii, b, e, pomega)])
+
+
+def main(args):
+    # Add an injections if requested.
+    injections = None
+    if args.injections > 0:
+        if args.seed is not None:
+            np.random.seed(args.seed)
+        injections = generate_system(args.injections, mstar=args.mstar,
+                                     rstar=args.rstar,
+                                     min_period=args.min_period,
+                                     max_period=args.max_period)
+
+    # Prepare the system.
+    prepare(args.kicid, args.archive_root, args.data_root, args.results_root,
+            durations=args.durations, min_period=args.min_period,
+            max_period=args.max_period, injections=injections)
 
 
 if __name__ == "__main__":
@@ -112,17 +136,4 @@ if __name__ == "__main__":
     print("args:")
     print(args)
 
-    # Add an injections if requested.
-    injections = None
-    if args.injections > 0:
-        if args.seed is not None:
-            np.random.seed(args.seed)
-        injections = generate_system(args.injections, mstar=args.mstar,
-                                     rstar=args.rstar,
-                                     min_period=args.min_period,
-                                     max_period=args.max_period)
-
-    # Prepare the system.
-    prepare(args.kicid, args.archive_root, args.data_root, args.results_root,
-            durations=args.durations, min_period=args.min_period,
-            max_period=args.max_period, injections=injections)
+    main(args)

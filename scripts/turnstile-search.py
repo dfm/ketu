@@ -3,14 +3,14 @@
 
 from __future__ import division, print_function
 
-import cPickle as pickle
+import cPickle
+from IPython.parallel import Client, require
 
 
+@require(cPickle)
 def search(pkl_fn):
     with open(pkl_fn, "rb") as f:
-        q, pipe = pickle.load(f)
-
-    print(q)
+        q, pipe = cPickle.load(f)
 
     print("Starting {0}".format(q["kicid"]))
     pipe.query(**q)
@@ -18,13 +18,16 @@ def search(pkl_fn):
 
 
 if __name__ == "__main__":
+    import os
     import sys
     import argparse
 
     parser = argparse.ArgumentParser()
 
-    # Required arguments.
     parser.add_argument("files", nargs="+", help="the prepared files")
+    parser.add_argument("-p", "--profile-dir", default=None,
+                        help="the IPython profile dir")
+
     args = parser.parse_args()
     print("Running with the following arguments:")
     print("sys.argv:")
@@ -32,4 +35,9 @@ if __name__ == "__main__":
     print("args:")
     print(args)
 
-    map(search, args.files)
+    if len(args.files) == 1:
+        search(args.files[0])
+    else:
+        c = Client(profile_dir=args.profile_dir)
+        pool = c.load_balanced_view()
+        list(pool.map(search, map(os.path.abspath, args.files)))

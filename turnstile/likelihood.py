@@ -45,10 +45,10 @@ class LCWrapper(object):
                                   * integrated_time(self.flux)) ** 2
 
         # (c) the distance scale length:
-        x = lc.predictors - 1
+        x = (lc.predictors - 1) * 1e3
         d = (x[np.random.randint(len(x), size=10000)] -
              x[np.random.randint(len(x), size=10000)])
-        self.ell = dist_factor * np.mean(np.sum(d**2, axis=1))
+        self.ell = dist_factor * np.median(np.sum(d**2, axis=1))
 
         # Include time as an input feature
         x = np.concatenate((np.atleast_2d(self.time).T, x), axis=1)
