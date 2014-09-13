@@ -1,7 +1,6 @@
 .DS_Store
 *.o
 bin/*
-data
 venv
 *.so
 turnstile/_bls*
