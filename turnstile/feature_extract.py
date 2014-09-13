@@ -49,8 +49,7 @@ class FeatureExtract(Pipeline):
 
         # ... and the known KOIs.
         kic = parent_response.star
-        kois = []  # kic.kois
-        # kois = kic.kois
+        kois = kic.kois
         dtype = [("id", np.float32), ("period", np.float64),
                  ("t0", np.float64), ("depth", np.float64),
                  ("rec", bool)]
