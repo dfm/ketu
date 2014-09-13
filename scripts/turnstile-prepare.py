@@ -41,8 +41,8 @@ def prepare(kicid, archive_root, data_root, results_root, injections=None,
     pipe = turnstile.PreparedDownload(basepath=cache_root, cache=False)
 
     # Add the injections if given.
+    pipe = turnstile.Inject(pipe, cache=False)
     if injections is not None:
-        pipe = turnstile.Inject(pipe, cache=False)
         q = dict(q, **injections)
 
     pipe = turnstile.Prepare(pipe, cache=False)
@@ -68,7 +68,7 @@ def generate_system(K, mstar=1.0, rstar=1.0, min_period=50., max_period=400.):
     periods = np.exp(np.random.uniform(np.log(min_period), np.log(max_period),
                                        size=K))
     t0s = np.array([np.random.uniform(0, p) for p in periods])
-    radii = np.random.uniform(0.005, 0.16, K)
+    radii = np.random.uniform(0.005, 0.04, K)
     b = np.random.uniform(0, 1, K)
     e = beta.rvs(0.867, 3.03, size=K)
     pomega = np.random.uniform(0, 2*np.pi, K)

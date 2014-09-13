@@ -18,7 +18,7 @@ def prepare_download(query, fetch=True):
     client = kplr.API(data_root=query["data_root"])
     kicid = query["kicid"]
     kic = client.star(kicid)
-    kic.kois
+    # kic.kois
 
     # Download the light curves.
     short_cadence = query["short_cadence"]
