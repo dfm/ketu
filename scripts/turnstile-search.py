@@ -20,11 +20,12 @@ def search(pkl_fn):
 if __name__ == "__main__":
     import os
     import sys
+    import glob
     import argparse
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("files", nargs="+", help="the prepared files")
+    parser.add_argument("file_pattern", help="the file pattern")
     parser.add_argument("-p", "--profile-dir", default=None,
                         help="the IPython profile dir")
 
@@ -35,9 +36,6 @@ if __name__ == "__main__":
     print("args:")
     print(args)
 
-    if len(args.files) == 1:
-        search(args.files[0])
-    else:
-        c = Client(profile_dir=args.profile_dir)
-        pool = c.load_balanced_view()
-        list(pool.map(search, map(os.path.abspath, args.files)))
+    c = Client(profile_dir=args.profile_dir)
+    pool = c.load_balanced_view()
+    list(pool.map(search, map(os.path.abspath, glob.glob(args.file_pattern))))

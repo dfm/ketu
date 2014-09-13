@@ -83,18 +83,22 @@ def generate_system(K, mstar=1.0, rstar=1.0, min_period=50., max_period=400.):
 def main(args):
     # Add an injections if requested.
     injections = None
-    if args.injections > 0:
-        if args.seed is not None:
+    if args.get("injections", 0) > 0:
+        if args.get("seed", None) is not None:
             np.random.seed(args.seed)
-        injections = generate_system(args.injections, mstar=args.mstar,
-                                     rstar=args.rstar,
-                                     min_period=args.min_period,
-                                     max_period=args.max_period)
+        injections = generate_system(args.get("injections", 0),
+                                     mstar=args.get("mstar", 1.0),
+                                     rstar=args.get("rstar", 1.0),
+                                     min_period=args.get("min_period", 50.0),
+                                     max_period=args.get("max_period", 400.0))
 
     # Prepare the system.
-    prepare(args.kicid, args.archive_root, args.data_root, args.results_root,
-            durations=args.durations, min_period=args.min_period,
-            max_period=args.max_period, injections=injections)
+    prepare(args["kicid"], args["archive_root"], args["data_root"],
+            args["results_root"],
+            durations=args.get("durations", [0.2, 0.4, 0.6]),
+            min_period=args.get("min_period", 50.0),
+            max_period=args.get("max_period", 400.0),
+            injections=injections)
 
 
 if __name__ == "__main__":
@@ -136,4 +140,4 @@ if __name__ == "__main__":
     print("args:")
     print(args)
 
-    main(args)
+    main(vars(args))
