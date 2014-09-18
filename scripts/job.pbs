@@ -11,12 +11,12 @@ module purge
 export PATH="$HOME/miniconda/bin:$PATH"
 
 # Needed environment variables.
-export KPLR_DATA_DIR=$SCRATCH/kplr
-export TURNSTILE_PATH=$SCRATCH/turnstile/cache
+export KPLR_DATA_DIR={data_root}
+export TURNSTILE_PATH=$WORK/turnstile/cache
 
 # Locations.
 SRCDIR=$HOME/projects/turnstile
-RUNDIR=$SCRATCH/turnstile/run-${PBS_JOBID/.*}
+RUNDIR={results_root}
 PROFILEDIR=$RUNDIR/profile
 mkdir -p $RUNDIR
 cd $RUNDIR
@@ -36,7 +36,7 @@ done
 
 if (( success )); then
     # Run the analysis.
-    python $SRCDIR/scripts/injections.py $PBS_NP --iterations 10 --profile-dir $PROFILEDIR &> output.log
+    python $SRCDIR/scripts/search.py "{results_root}/*/pipeline.pkl" --profile-dir $PROFILEDIR &> output.log
 else
     echo "Server never started" &> output.log
 fi
