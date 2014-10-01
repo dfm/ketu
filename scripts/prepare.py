@@ -23,13 +23,13 @@ def prepare(kicid, archive_root, data_root, results_root, injections=None,
         pass
 
     # Start by moving the files into place.
-    fn = os.path.join(results_root, "download.pkl")
-    turnstile.PreparedDownload.prepare(fn, archive_root, data_root, kicid)
+    # fn = os.path.join(results_root, "download.pkl")
+    # turnstile.PreparedDownload.prepare(fn, archive_root, data_root, kicid)
 
     # Set up the default query.
     q = dict(
         kicid=kicid,
-        prepared_file=fn,
+        # prepared_file=fn,
         durations=sorted(map(float, durations)),
         min_period=float(min_period),
         max_period=float(max_period),
@@ -38,7 +38,8 @@ def prepare(kicid, archive_root, data_root, results_root, injections=None,
 
     # And the pipeline.
     cache_root = os.path.join(results_root, "cache")
-    pipe = turnstile.PreparedDownload(basepath=cache_root, cache=False)
+    pipe = turnstile.Download(basepath=cache_root, cache=False)
+    # pipe = turnstile.PreparedDownload(basepath=cache_root, cache=False)
 
     # Add the injections if given.
     pipe = turnstile.Inject(pipe, cache=False)
