@@ -46,6 +46,8 @@ if __name__ == "__main__":
     print("args:")
     print(args)
 
-    c = Client(profile_dir=args.profile_dir)
-    pool = c.load_balanced_view()
-    list(pool.map(search, map(os.path.abspath, glob.glob(args.file_pattern))))
+    list(map(search, map(os.path.abspath, glob.glob(args.file_pattern))))
+
+    # c = Client(profile_dir=args.profile_dir)
+    # pool = c.load_balanced_view()
+    # list(pool.map(search, map(os.path.abspath, glob.glob(args.file_pattern))))
