@@ -30,7 +30,7 @@ class PeakDetect(Pipeline):
 
     cache_ext = ".h5"
     query_parameters = dict(
-        number_of_peaks=(10, False),
+        number_of_peaks=(20, False),
         overlap_tol=(0.1, False),
         max_overlap=(0, False),
     )
