@@ -11,20 +11,26 @@ from IPython.parallel import Client, require
 
 @require(os, gc, cPickle)
 def search(pkl_fn):
-    with open(pkl_fn, "rb") as f:
-        q, pipe = cPickle.load(f)
-    if os.path.exists(os.path.join(q["validation_path"], "features.h5")):
-        return
+    r, q, pipe = None, None, None
+    try:
+        with open(pkl_fn, "rb") as f:
+            q, pipe = cPickle.load(f)
+        if os.path.exists(os.path.join(q["validation_path"], "features.h5")):
+            return
 
-    print("Starting {0}".format(q["kicid"]))
-    r = pipe.query(**q)
-    print("Finished {0}".format(q["kicid"]))
+        print("Starting {0}".format(q["kicid"]))
+        r = pipe.query(**q)
+        print("Finished {0}".format(q["kicid"]))
 
-    # Try to fix memory leaks.
-    del r
-    del q
-    del pipe
-    gc.collect()
+    except Exception as e:
+        print(e)
+
+    finally:
+        # Try to fix memory leaks.
+        del r
+        del q
+        del pipe
+        gc.collect()
 
 
 if __name__ == "__main__":
