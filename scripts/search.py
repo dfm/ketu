@@ -3,18 +3,23 @@
 
 from __future__ import division, print_function
 
+import gc
 import cPickle
 from IPython.parallel import Client, require
 
 
-@require(cPickle)
+@require(cPickle, gc)
 def search(pkl_fn):
     with open(pkl_fn, "rb") as f:
         q, pipe = cPickle.load(f)
 
     print("Starting {0}".format(q["kicid"]))
-    pipe.query(**q)
+    r = pipe.query(**q)
     print("Finished {0}".format(q["kicid"]))
+
+    # Try to fix memory leaks.
+    del r
+    gc.collect()
 
 
 if __name__ == "__main__":
