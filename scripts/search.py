@@ -3,15 +3,18 @@
 
 from __future__ import division, print_function
 
+import os
 import gc
 import cPickle
 from IPython.parallel import Client, require
 
 
-@require(cPickle, gc)
+@require(os, gc, cPickle)
 def search(pkl_fn):
     with open(pkl_fn, "rb") as f:
         q, pipe = cPickle.load(f)
+    if os.path.exists(os.path.join(q["validation_path"], "features.h5")):
+        return
 
     print("Starting {0}".format(q["kicid"]))
     r = pipe.query(**q)
@@ -19,6 +22,8 @@ def search(pkl_fn):
 
     # Try to fix memory leaks.
     del r
+    del q
+    del pipe
     gc.collect()
 
 
