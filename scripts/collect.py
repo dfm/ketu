@@ -40,7 +40,9 @@ if __name__ == "__main__":
         pass
 
     # Loop over results directories.
+    dtype = None
     injections = []
+    features = []
     for d in glob.iglob(args.pattern):
         feat_fn = os.path.join(d, "results", "features.h5")
         if not os.path.exists(feat_fn):
@@ -50,21 +52,26 @@ if __name__ == "__main__":
         with h5py.File(feat_fn, "r") as f:
             inj_rec = f["inj_rec"][...]
             injections.append(inj_rec)
-            # # koi_rec = f["koi_rec"][...]
 
-            # # Loop over the peaks and check if they're injections.
-            # peaks = []
-            # for nm in f:
-            #     if not nm.startswith("peak_"):
-            #         continue
-            #     g = f[nm]
-            #     peak = dict(g.attrs)
-            #     # peak["corr_lc"] = g["corr_lc"][...]
-            #     # peak["bin_lc"] = g["bin_lc"][...]
-            #     peaks.append(peak)
-            # print(inj_rec.dtype)
-            # print(peaks[0])
-            # assert 0
+            # Loop over the peaks and check if they're injections.
+            peaks = []
+            for nm in f:
+                if not nm.startswith("peak_"):
+                    continue
+                g = f[nm]
+                peak = dict(g.attrs)
+                if dtype is None:
+                    dtype = [(str(c), float) for c in sorted(peak.keys())
+                             if not c.startswith("is_")]
+                    dtype = np.dtype(dtype + [("is_injection", bool),
+                                              ("is_koi", bool)])
+                features.append(tuple([peak[c] for c in dtype.names]))
+
+    # Save the features.
+    features = np.array(features, dtype=dtype)
+    print(len(features))
+    with h5py.File(os.path.join(args.results, "features.h5"), "w") as f:
+        f.create_dataset("features", data=features)
 
     dtype = injections[0].dtype
     injections = np.array(np.concatenate(injections, axis=0), dtype=dtype)

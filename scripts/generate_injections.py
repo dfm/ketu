@@ -22,7 +22,6 @@ parser.add_argument("total_number", type=int,
                     help="the number of stars to test")
 parser.add_argument("archive_root",
                     help="the current location of the data")
-parser.add_argument("data_root", help="the destination for the data")
 parser.add_argument("results_root", help="the results location")
 
 parser.add_argument("-t", "--pbs-template",
@@ -60,7 +59,6 @@ with open(args.pbs_template, "r") as f:
 with open(os.path.join(args.results_root, "job.pbs"), "w") as f:
     f.write(template.format(
         results_root=os.path.abspath(args.results_root),
-        data_root=os.path.abspath(args.data_root),
     ))
 
 # Load the stellar sample.

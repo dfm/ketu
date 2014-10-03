@@ -11,10 +11,9 @@ import cPickle as pickle
 from scipy.stats import beta
 
 
-def prepare(kicid, archive_root, data_root, results_root, injections=None,
+def prepare(kicid, archive_root, results_root, injections=None,
             durations=[0.2, 0.4, 0.6], min_period=50, max_period=400):
     archive_root = os.path.abspath(archive_root)
-    data_root = os.path.abspath(data_root)
     results_root = os.path.abspath(results_root)
 
     try:
@@ -94,7 +93,7 @@ def main(args):
                                      max_period=args.get("max_period", 400.0))
 
     # Prepare the system.
-    prepare(args["kicid"], args["archive_root"], args["data_root"],
+    prepare(args["kicid"], args["archive_root"],
             args["results_root"],
             durations=args.get("durations", [0.2, 0.4, 0.6]),
             min_period=args.get("min_period", 50.0),
@@ -112,7 +111,6 @@ if __name__ == "__main__":
     parser.add_argument("kicid", type=int, help="the KIC ID")
     parser.add_argument("archive_root",
                         help="the current location of the data")
-    parser.add_argument("data_root", help="the destination for the data")
     parser.add_argument("results_root", help="the results location")
 
     # Search parameters.
