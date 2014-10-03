@@ -37,6 +37,7 @@ if __name__ == "__main__":
     import os
     import sys
     import glob
+    import time
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -52,8 +53,20 @@ if __name__ == "__main__":
     print("args:")
     print(args)
 
-    list(map(search, map(os.path.abspath, glob.glob(args.file_pattern))))
-
-    # c = Client(profile_dir=args.profile_dir)
-    # pool = c.load_balanced_view()
-    # list(pool.map(search, map(os.path.abspath, glob.glob(args.file_pattern))))
+    c = Client(profile_dir=args.profile_dir)
+    pool = c.load_balanced_view()
+    jobs = [(fn, pool.apply(search, fn))
+            for fn in map(os.path.abspath, glob.glob(args.file_pattern))]
+    retrieved = [False] * len(jobs)
+    while not all(retrieved):
+        for i, (fn, j) in enumerate(jobs):
+            if j.ready() and not retrieved[i]:
+                try:
+                    j.get()
+                except Exception as e:
+                    print("Task failed: {0}".format(fn))
+                    print("With error: \n{0}".format(e))
+                else:
+                    print("Finished: {0}".format(fn))
+                retrieved[i] = True
+        time.sleep(1)

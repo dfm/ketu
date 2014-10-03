@@ -94,7 +94,7 @@ if __name__ == "__main__":
 
     x, y = bins
     z = np.exp(lncompleteness[1:-1, 1:-1])
-    z = scipy.ndimage.filters.gaussian_filter(z, 1.)
+    z = scipy.ndimage.filters.gaussian_filter(z, 1)
     c = pl.contour(x[:-1]+0.5*np.diff(x), y[:-1]+0.5*np.diff(y), z.T,
                    8, colors="k", linewidths=1, alpha=0.6, vmin=0,
                    vmax=1)
