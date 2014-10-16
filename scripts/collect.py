@@ -5,6 +5,7 @@ from __future__ import division, print_function
 
 import os
 import sys
+import json
 import glob
 import h5py
 import numpy as np
@@ -49,9 +50,19 @@ if __name__ == "__main__":
             print("Skipping {0}".format(d))
             continue
 
+        q_fn = os.path.join(d, "results", "query.json")
+        with open(q_fn, "r") as f:
+            data = json.load(f)
+            kicid = data["kicid"]
+
         with h5py.File(feat_fn, "r") as f:
             inj_rec = f["inj_rec"][...]
-            injections.append(inj_rec)
+            if len(inj_rec):
+                injections.append(inj_rec)
+
+            extracols = ["kic_kepmag", "kic_teff", "kic_logg"]
+            extra = [kicid] + [f.attrs[k] for k in extracols]
+            extracols = ["kicid"] + extracols
 
             # Loop over the peaks and check if they're injections.
             peaks = []
@@ -63,9 +74,11 @@ if __name__ == "__main__":
                 if dtype is None:
                     dtype = [(str(c), float) for c in sorted(peak.keys())
                              if not c.startswith("is_")]
-                    dtype = np.dtype(dtype + [("is_injection", bool),
-                                              ("is_koi", bool)])
-                features.append(tuple([peak[c] for c in dtype.names]))
+                    dtype = dtype + [("is_injection", bool), ("is_koi", bool)]
+                    colnames = [c for c, _ in dtype]
+                    dtype = zip(extracols, [int, float, float]) + dtype
+                    dtype = np.dtype(dtype)
+                features.append(tuple(extra + [peak[c] for c in colnames]))
 
     # Save the features.
     features = np.array(features, dtype=dtype)
@@ -73,6 +86,7 @@ if __name__ == "__main__":
     with h5py.File(os.path.join(args.results, "features.h5"), "w") as f:
         f.create_dataset("features", data=features)
 
+    print(injections)
     dtype = injections[0].dtype
     injections = np.array(np.concatenate(injections, axis=0), dtype=dtype)
 
@@ -88,7 +102,7 @@ if __name__ == "__main__":
     z = scipy.ndimage.filters.gaussian_filter(z, 1.)
     x, y = b
     c = pl.contour(x[:-1]+0.5*np.diff(x), y[:-1]+0.5*np.diff(y), z.T,
-                   8, colors="r", linewidths=1, alpha=0.6, vmin=0,
+                   12, colors="r", linewidths=1, alpha=0.6, vmin=0,
                    vmax=1)
     pl.clabel(c, fontsize=12, inline=1, fmt="%.2f")
 
@@ -103,7 +117,7 @@ if __name__ == "__main__":
     z = np.exp(lncompleteness[1:-1, 1:-1])
     z = scipy.ndimage.filters.gaussian_filter(z, 1)
     c = pl.contour(x[:-1]+0.5*np.diff(x), y[:-1]+0.5*np.diff(y), z.T,
-                   8, colors="k", linewidths=1, alpha=0.6, vmin=0,
+                   12, colors="k", linewidths=1, alpha=0.6, vmin=0,
                    vmax=1)
     pl.clabel(c, fontsize=12, inline=1, fmt="%.2f")
 
