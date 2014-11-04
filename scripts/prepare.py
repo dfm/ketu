@@ -12,7 +12,7 @@ from scipy.stats import beta
 
 
 def prepare(kicid, archive_root, results_root, injections=None,
-            durations=[0.2, 0.4, 0.6], min_period=50, max_period=750):
+            durations=[0.2, 0.4, 0.6, 0.8], min_period=50, max_period=750):
     archive_root = os.path.abspath(archive_root)
     results_root = os.path.abspath(results_root)
 
@@ -68,7 +68,7 @@ def generate_system(K, mstar=1.0, rstar=1.0, min_period=50., max_period=750.):
     periods = np.exp(np.random.uniform(np.log(min_period), np.log(max_period),
                                        size=K))
     t0s = np.array([np.random.uniform(0, p) for p in periods])
-    radii = np.random.uniform(0.005, 0.04, K)
+    radii = np.exp(np.random.uniform(np.log(0.007), np.log(0.15), K))
     b = np.random.uniform(0, 1, K)
     e = beta.rvs(0.867, 3.03, size=K)
     pomega = np.random.uniform(0, 2*np.pi, K)
