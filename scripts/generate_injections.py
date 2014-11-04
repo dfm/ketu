@@ -38,7 +38,7 @@ parser.add_argument("--durations", nargs="+", type=float,
                     help="the durations to test")
 parser.add_argument("--min-period", type=float, default=50.0,
                     help="minimum period")
-parser.add_argument("--max-period", type=float, default=400.0,
+parser.add_argument("--max-period", type=float, default=750.0,
                     help="maximum period")
 
 args = parser.parse_args()

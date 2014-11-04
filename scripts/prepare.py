@@ -12,7 +12,7 @@ from scipy.stats import beta
 
 
 def prepare(kicid, archive_root, results_root, injections=None,
-            durations=[0.2, 0.4, 0.6], min_period=50, max_period=400):
+            durations=[0.2, 0.4, 0.6], min_period=50, max_period=750):
     archive_root = os.path.abspath(archive_root)
     results_root = os.path.abspath(results_root)
 
@@ -62,7 +62,7 @@ def prepare(kicid, archive_root, results_root, injections=None,
         json.dump(q, f, sort_keys=True, indent=2, separators=(",", ": "))
 
 
-def generate_system(K, mstar=1.0, rstar=1.0, min_period=50., max_period=400.):
+def generate_system(K, mstar=1.0, rstar=1.0, min_period=50., max_period=750.):
     labels = ["period", "t0", "radius", "b", "e", "pomega", "q1", "q2"]
 
     periods = np.exp(np.random.uniform(np.log(min_period), np.log(max_period),
@@ -90,14 +90,14 @@ def main(args):
                                      mstar=args.get("mstar", 1.0),
                                      rstar=args.get("rstar", 1.0),
                                      min_period=args.get("min_period", 50.0),
-                                     max_period=args.get("max_period", 400.0))
+                                     max_period=args.get("max_period", 750.0))
 
     # Prepare the system.
     prepare(args["kicid"], args["archive_root"],
             args["results_root"],
             durations=args.get("durations", [0.2, 0.4, 0.6]),
             min_period=args.get("min_period", 50.0),
-            max_period=args.get("max_period", 400.0),
+            max_period=args.get("max_period", 750.0),
             injections=injections)
 
 
@@ -119,7 +119,7 @@ if __name__ == "__main__":
                         help="the durations to test")
     parser.add_argument("--min-period", type=float, default=50.0,
                         help="minimum period")
-    parser.add_argument("--max-period", type=float, default=400.0,
+    parser.add_argument("--max-period", type=float, default=750.0,
                         help="maximum period")
 
     # Injection parameters.
