@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -l nodes=4:ppn=20
+#PBS -l nodes=8:ppn=20
 #PBS -l walltime=12:00:00
 #PBS -l mem=350GB
 #PBS -N turnstile
@@ -26,7 +26,7 @@ cp -r $HOME/.ipython/profile_mpi $PROFILEDIR
 ipcluster start -n $PBS_NP --profile-dir=$PROFILEDIR &> ipcluster.log &
 
 sleep 5
-for (( try=0; try < 10; ++try )); do
+for (( try=0; try < 100; ++try )); do
     if cat ipcluster.log | grep -q "Engines appear to have started successfully"; then
         success=1
         break
