@@ -11,6 +11,7 @@ import h5py
 import numpy as np
 import scipy.ndimage
 import matplotlib.pyplot as pl
+from numpy.lib import recfunctions
 
 
 with h5py.File("completeness.h5", "r") as f:
@@ -58,7 +59,10 @@ if __name__ == "__main__":
         with h5py.File(feat_fn, "r") as f:
             inj_rec = f["inj_rec"][...]
             if len(inj_rec):
-                injections.append(inj_rec)
+                injections.append(
+                    recfunctions.append_fields(inj_rec, "kicid",
+                                               kicid + np.zeros(len(inj_rec),
+                                                                dtype=int)))
 
             extracols = ["kic_kepmag", "kic_teff", "kic_logg"]
             extra = [kicid] + [f.attrs[k] for k in extracols]
@@ -76,7 +80,7 @@ if __name__ == "__main__":
                              if not c.startswith("is_")]
                     dtype = dtype + [("is_injection", bool), ("is_koi", bool)]
                     colnames = [c for c, _ in dtype]
-                    dtype = zip(extracols, [int, float, float]) + dtype
+                    dtype = zip(extracols, [int, float, float, float]) + dtype
                     dtype = np.dtype(dtype)
                 features.append(tuple(extra + [peak[c] for c in colnames]))
 
@@ -86,9 +90,12 @@ if __name__ == "__main__":
     with h5py.File(os.path.join(args.results, "features.h5"), "w") as f:
         f.create_dataset("features", data=features)
 
-    print(injections)
     dtype = injections[0].dtype
     injections = np.array(np.concatenate(injections, axis=0), dtype=dtype)
+    with h5py.File(os.path.join(args.results, "injections.h5"), "w") as f:
+        f.create_dataset("injections", data=injections)
+
+    assert 0
 
     m = injections["rec"]
     print(np.sum(m), len(injections))

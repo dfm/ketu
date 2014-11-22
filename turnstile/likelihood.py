@@ -41,37 +41,40 @@ class LCWrapper(object):
         self.flux *= 1e3
         self.ferr *= 1e3
 
-        # Estimate the hyperparameters:
-        # (a) the variance:
-        self.var = np.var(self.flux)
+        # # Estimate the hyperparameters:
+        # # (a) the variance:
+        # self.var = np.var(self.flux)
 
-        # (b) the time scale length:
-        l = len(self.flux)
-        tau = max(
-            integrated_time(self.flux[i*l//n:(i+1)*l//n])
-            for n in range(3) for i in range(n)
-        )
-        self.tau = time_factor * (np.median(np.diff(self.time)) * tau) ** 2
-        if matern:
-            self.tau *= 10.0
+        # # (b) the time scale length:
+        # l = len(self.flux)
+        # tau = max(
+        #     integrated_time(self.flux[i*l//n:(i+1)*l//n])
+        #     for n in range(3) for i in range(n)
+        # )
+        # self.tau = time_factor * (np.median(np.diff(self.time)) * tau) ** 2
+        # if matern:
+        #     self.tau *= 10.0
 
-        # (c) the distance scale length:
-        x = lc.predictors - 1
-        d = (x[np.random.randint(len(x), size=10000)] -
-             x[np.random.randint(len(x), size=10000)])
-        self.ell = dist_factor * np.mean(np.sum(d**2, axis=1))
+        # # (c) the distance scale length:
+        # x = lc.predictors - 1
+        # d = (x[np.random.randint(len(x), size=10000)] -
+        #      x[np.random.randint(len(x), size=10000)])
+        # self.ell = dist_factor * np.mean(np.sum(d**2, axis=1))
 
-        # Include time as an input feature
-        x = np.concatenate((np.atleast_2d(self.time).T, x), axis=1)
-        ndim = x.shape[1]
+        # # Include time as an input feature
+        # x = np.concatenate((np.atleast_2d(self.time).T, x), axis=1)
+        # ndim = x.shape[1]
 
-        scale = np.append(self.tau, self.ell + np.zeros(ndim-1))
-        if matern:
-            self.kernel = self.var * Matern32Kernel(scale, ndim)
-        else:
-            self.kernel = self.var * ExpSquaredKernel(scale, ndim)
+        # scale = np.append(self.tau, self.ell + np.zeros(ndim-1))
+        # if matern:
+        #     self.kernel = self.var * Matern32Kernel(scale, ndim)
+        # else:
+        #     self.kernel = self.var * ExpSquaredKernel(scale, ndim)
+
+        tau = np.median(np.diff(self.time)) * integrated_time(self.flux)
+        self.kernel = np.var(self.flux) * ExpSquaredKernel(tau ** 2)
         self.gp = george.GP(self.kernel, solver=george.HODLRSolver)
-        self.gp.compute(x, self.ferr)
+        self.gp.compute(self.time, self.ferr, seed=1234)
 
         # Compute the likelihood of the null model.
         self.ll0 = 0.0
