@@ -41,44 +41,45 @@ class LCWrapper(object):
         self.flux *= 1e3
         self.ferr *= 1e3
 
-        # # Estimate the hyperparameters:
-        # # (a) the variance:
-        # self.var = np.var(self.flux)
-
-        # # (b) the time scale length:
-        # l = len(self.flux)
-        # tau = max(
-        #     integrated_time(self.flux[i*l//n:(i+1)*l//n])
-        #     for n in range(3) for i in range(n)
-        # )
-        # self.tau = time_factor * (np.median(np.diff(self.time)) * tau) ** 2
-        # if matern:
-        #     self.tau *= 10.0
-
-        # # (c) the distance scale length:
-        # x = lc.predictors - 1
-        # d = (x[np.random.randint(len(x), size=10000)] -
-        #      x[np.random.randint(len(x), size=10000)])
-        # self.ell = dist_factor * np.mean(np.sum(d**2, axis=1))
-
-        # # Include time as an input feature
-        # x = np.concatenate((np.atleast_2d(self.time).T, x), axis=1)
-        # ndim = x.shape[1]
-
-        # scale = np.append(self.tau, self.ell + np.zeros(ndim-1))
-        # if matern:
-        #     self.kernel = self.var * Matern32Kernel(scale, ndim)
-        # else:
-        #     self.kernel = self.var * ExpSquaredKernel(scale, ndim)
-
+        # Hackishly build a kernel.
         tau = np.median(np.diff(self.time)) * integrated_time(self.flux)
         self.kernel = np.var(self.flux) * ExpSquaredKernel(tau ** 2)
         self.gp = george.GP(self.kernel, solver=george.HODLRSolver)
         self.gp.compute(self.time, self.ferr, seed=1234)
 
         # Compute the likelihood of the null model.
-        self.ll0 = 0.0
-        self.ll0, _, _ = self.lnlike(order=1)
+        self.ll0 = self.lnlike()
+
+    def lnlike(self, model=None):
+        y = self.flux
+        Cf = self.gp.solver.apply_inverse(y)
+
+        # No model is given. Just evaluate the lnlikelihood.
+        if model is None:
+            return -0.5 * np.dot(y, Cf)
+
+        # A model is given, use it to do a linear fit.
+        m = model(self.time)
+        if np.all(m == 0.0):
+            return 0.0, 0.0, 0.0
+
+        # Compute the inverse variance.
+        Cm = self.gp.solver.apply_inverse(m)
+        S = np.dot(m, Cm)
+        if S <= 0.0:
+            return 0.0, 0.0, 0.0
+
+        # Compute the depth.
+        d = np.dot(m, Cf) / S
+        if not np.isfinite(d):
+            return 0.0, 0.0, 0.0
+
+        # Compute the lnlikelihood.
+        dll = -0.5*np.dot(self.flux-d*m, Cf-d*Cm) - self.ll0
+        if not np.isfinite(dll):
+            return 0.0, 0.0, 0.0
+
+        return dll, d, S
 
     def linear_maximum_likelihood(self, model=None, order=2, y=None):
         if y is None:
@@ -95,7 +96,7 @@ class LCWrapper(object):
         # Precompute some useful factors.
         Cf = self.gp.solver.apply_inverse(y)
         Cm = self.gp.solver.apply_inverse(m)
-        S = np.atleast_2d(np.dot(mT, Cm))
+        S = np.atleast_2d(np.dot(m, Cm))
 
         # Solve for the maximum likelihood model.
         factor = cho_factor(S, overwrite_a=True)
@@ -121,15 +122,15 @@ class LCWrapper(object):
         return sig, bkg + np.dot(self.kernel.value(self.gp._x),
                                  Cf - np.dot(Cm, w))
 
-    def lnlike(self, model=None, order=2):
-        try:
-            w, m, sigma, Cf, Cm = self.linear_maximum_likelihood(model, order)
-        except LinAlgError:
-            return 0.0, 0.0, 0.0
+    # def lnlike(self, model=None, order=2):
+    #     try:
+    #         w, m, sigma, Cf, Cm = self.linear_maximum_likelihood(model, order)
+    #     except LinAlgError:
+    #         return 0.0, 0.0, 0.0
 
-        depth = w[0]
-        ivar = 1.0 / sigma[0, 0]
+    #     depth = w[0]
+    #     ivar = 1.0 / sigma[0, 0]
 
-        # Compute the value of the likelihood at its maximum.
-        dll = -0.5*np.dot(self.flux-np.dot(m, w), Cf-np.dot(Cm, w)) - self.ll0
-        return dll, depth, ivar
+    #     # Compute the value of the likelihood at its maximum.
+    #     dll = -0.5*np.dot(self.flux-np.dot(m, w), Cf-np.dot(Cm, w)) - self.ll0
+    #     return dll, depth, ivar

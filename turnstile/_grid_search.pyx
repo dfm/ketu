@@ -2,7 +2,7 @@ from __future__ import division
 
 cimport cython
 from libc.stdlib cimport malloc, free
-from libc.math cimport ceil, round, log, INFINITY
+from libc.math cimport ceil, round, log, INFINITY, sqrt
 
 import numpy as np
 cimport numpy as np
@@ -11,7 +11,7 @@ DTYPE = np.float64
 ctypedef np.float64_t DTYPE_t
 
 
-@cython.boundscheck(False)
+# @cython.boundscheck(False)
 cdef int evaluate_single(double alpha, double period, double t0,
                          double tmin, double tmax, double time_spacing,
                          int nduration, double* dll_1d,
@@ -19,7 +19,6 @@ cdef int evaluate_single(double alpha, double period, double t0,
                          double* phic_variable, double* phic_same,
                          double* depth_2d, double* depth_ivar_2d,
                          int* inds):
-    # MAGIC!
     cdef int k, ind, nind
 
     # Initialize the results array at zero.
@@ -62,6 +61,7 @@ cdef int evaluate_single(double alpha, double period, double t0,
             depth_2d[k] += depth_1d[ind] * depth_ivar_1d[ind]
             depth_ivar_2d[k] += depth_ivar_1d[ind]
 
+            # FIXME: WTF?!
             ind += 1
 
         # Go to the next transit.
@@ -95,7 +95,7 @@ cdef int evaluate_single(double alpha, double period, double t0,
     return nind
 
 
-@cython.boundscheck(False)
+# @cython.boundscheck(False)
 def grid_search(double alpha,
                 double tmin, double tmax, double time_spacing,
                 np.ndarray[DTYPE_t, ndim=2] depth_1d,
@@ -133,8 +133,11 @@ def grid_search(double alpha,
 
     # Pointers to the input arrays.
     cdef double* dll_1d_data = <double*>dll_1d.data
-    cdef double* depth_1d_data = <double*>depth_1d.data,
-    cdef double* depth_ivar_1d_data = <double*>depth_ivar_1d.data,
+    cdef double* depth_1d_data = <double*>depth_1d.data
+    cdef double* depth_ivar_1d_data = <double*>depth_ivar_1d.data
+
+    # Keep track of the depth and s2n.
+    cdef double best_depth, best_s2n, tmp_s2n
 
     # Workspace for the transit indices.
     cdef int nimx = int(ceil((tmax - tmin) / periods.min()))
@@ -144,6 +147,8 @@ def grid_search(double alpha,
     for i in range(nperiod):
         period = periods[i]
         t0 = 0.0
+        best_depth = 0.0
+        best_s2n = 0.0
 
         # Loop over every possible phase for the given period.
         while 1:
@@ -155,8 +160,12 @@ def grid_search(double alpha,
 
             # Loop over durations and decide if this should be accepted.
             for k in range(nduration):
+                tmp_s2n = depth_2d_tmp[k] * sqrt(depth_ivar_2d_tmp[k])
+                # if depth_2d_tmp[k] > 0.0 and :
                 if (depth_2d_tmp[k] > 0.0 and
-                        phic_same_tmp[k] > phic_variable_tmp[k]):
+                        phic_same_tmp[k] > phic_variable_tmp[k] and
+                        tmp_s2n > best_s2n):
+                    best_s2n = tmp_s2n
                     if phic_same_tmp[k] > phic_same[i, k]:
                         phic_same_2[i, k] = phic_same[i, k]
                         phic_same[i, k] = phic_same_tmp[k]
