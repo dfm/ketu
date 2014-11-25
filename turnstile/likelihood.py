@@ -9,7 +9,7 @@ from emcee.autocorr import integrated_time
 from scipy.linalg import cho_factor, cho_solve, LinAlgError
 
 import george
-from george.kernels import ExpSquaredKernel, Matern32Kernel
+from george.kernels import ExpSquaredKernel
 
 from .pipeline import Pipeline
 
@@ -60,7 +60,7 @@ class LCWrapper(object):
 
         # A model is given, use it to do a linear fit.
         m = model(self.time)
-        if np.all(m == 0.0):
+        if m[0] != 0.0 or m[-1] != 0.0 or np.all(m == 0.0):
             return 0.0, 0.0, 0.0
 
         # Compute the inverse variance.
@@ -121,16 +121,3 @@ class LCWrapper(object):
 
         return sig, bkg + np.dot(self.kernel.value(self.gp._x),
                                  Cf - np.dot(Cm, w))
-
-    # def lnlike(self, model=None, order=2):
-    #     try:
-    #         w, m, sigma, Cf, Cm = self.linear_maximum_likelihood(model, order)
-    #     except LinAlgError:
-    #         return 0.0, 0.0, 0.0
-
-    #     depth = w[0]
-    #     ivar = 1.0 / sigma[0, 0]
-
-    #     # Compute the value of the likelihood at its maximum.
-    #     dll = -0.5*np.dot(self.flux-np.dot(m, w), Cf-np.dot(Cm, w)) - self.ll0
-    #     return dll, depth, ivar

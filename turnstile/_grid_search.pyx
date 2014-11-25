@@ -11,7 +11,7 @@ DTYPE = np.float64
 ctypedef np.float64_t DTYPE_t
 
 
-# @cython.boundscheck(False)
+@cython.boundscheck(False)
 cdef int evaluate_single(double alpha, double period, double t0,
                          double tmin, double tmax, double time_spacing,
                          int nduration, double* dll_1d,
@@ -19,6 +19,7 @@ cdef int evaluate_single(double alpha, double period, double t0,
                          double* phic_variable, double* phic_same,
                          double* depth_2d, double* depth_ivar_2d,
                          int* inds):
+    cdef double t
     cdef int k, ind, nind
 
     # Initialize the results array at zero.
@@ -27,27 +28,33 @@ cdef int evaluate_single(double alpha, double period, double t0,
         depth_2d[k] = 0.0
         depth_ivar_2d[k] = 0.0
 
-    # Search through transit times for this given period and phase.
-    # We'll start from the earliest possible transit time.
-    cdef double t = tmin + t0
-    nind, ind = 0, 0
-    while t <= tmax - time_spacing:
-        # Compute the nearest 1-d index for this transit time.
-        ind = int(round((t - tmin) / time_spacing)) * nduration
+    # For simplicity, we'll make the outer loop be the duration.
+    for k in range(nduration):
+        # Start from the earliest possible transit time.
+        t = tmin + t0
+        nind, ind = 0, 0
 
-        # Remember the fact that we put a transit at this
-        # index. We'll need to use this to compute the PHIC of
-        # the single depth model.
-        inds[nind] = ind
-        nind += 1
+        # Loop through time checking every possible transit time.
+        while t <= tmax - time_spacing:
+            # Compute the nearest 1-d index for this transit time.
+            ind = int(round((t - tmin) / time_spacing)) * nduration + k
 
-        for k in range(nduration):
+            # Update the next time to the following transit.
+            t += period
+
+            # Skip this transit if there is no depth measured.
+            if depth_ivar_1d[ind] <= 0.0:
+                continue
+
+            # Remember the fact that we put a transit at this
+            # index. We'll need to use this to compute the PHIC of
+            # the single depth model.
+            inds[nind] = ind
+            nind += 1
+
             # Accumulate the likelihood for the variable depth
             # model. Note: the single depth model is computed
             # below using this result.
-
-            if depth_ivar_1d[ind] <= 0.0:
-                continue
 
             # First incorporate the delta log-likelihood for this
             # transit time.
@@ -61,32 +68,27 @@ cdef int evaluate_single(double alpha, double period, double t0,
             depth_2d[k] += depth_1d[ind] * depth_ivar_1d[ind]
             depth_ivar_2d[k] += depth_ivar_1d[ind]
 
-            # FIXME: WTF?!
-            ind += 1
+        # Now, use the results of the previous computation to evaluate the
+        # single depth PHIC.
 
-        # Go to the next transit.
-        t += period
-
-    # Now, use the results of the previous computation to evaluate the
-    # single depth PHIC.
-    for k in range(nduration):
         # Penalize the PHICs for the number of free parameters.
         phic_same[k] = phic_variable[k] - 0.5 * alpha
         phic_variable[k] -= 0.5 * nind * alpha
 
         # If there was any measurement for the depth, update the
         # single depth model.
-        if depth_ivar_2d[k] > 0:
+        if depth_ivar_2d[k] > 0 and nind > 2:
             depth_2d[k] /= depth_ivar_2d[k]
 
             # Loop over the saved list of transit times and evaluate
             # the depth measurement at the maximum likelihood location.
             for l in range(nind):
-                ind = inds[l] + k
+                ind = inds[l]
                 if depth_ivar_1d[ind] <= 0.0:
                     continue
                 d = depth_1d[ind] - depth_2d[k]
-                phic_same[k] -= 0.5*d*d*depth_ivar_1d[ind]
+                phic_same[k] -= 0.5 * d * d * depth_ivar_1d[ind]
+
         else:
             depth_2d[k] = 0.0
             depth_ivar_2d[k] = 0.0
@@ -95,7 +97,7 @@ cdef int evaluate_single(double alpha, double period, double t0,
     return nind
 
 
-# @cython.boundscheck(False)
+@cython.boundscheck(False)
 def grid_search(double alpha,
                 double tmin, double tmax, double time_spacing,
                 np.ndarray[DTYPE_t, ndim=2] depth_1d,

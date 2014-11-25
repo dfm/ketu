@@ -33,7 +33,7 @@ class Prepare(Pipeline):
         return dict(light_curves=chunks)
 
 
-def prepare_light_curve(lc, plcs, tol=20, min_length=0):
+def prepare_light_curve(lc, plcs, tol=20, min_length=100):
     data = lc.read(columns=["TIME", "SAP_FLUX", "SAP_FLUX_ERR", "SAP_QUALITY"])
     time = data["TIME"]
     flux = data["SAP_FLUX"]
@@ -47,7 +47,7 @@ def prepare_light_curve(lc, plcs, tol=20, min_length=0):
         if np.isnan(t):
             count += 1
         else:
-            if count > tol:
+            if count > tol or (qual[i] & (1)) != 0:
                 chunks.append(list(current))
                 current = []
                 count = 0
@@ -63,9 +63,11 @@ def prepare_light_curve(lc, plcs, tol=20, min_length=0):
     for chunk in chunks:
         if len(chunk) < min_length:
             continue
-        light_curves.append(LightCurve(time[chunk], flux[chunk], ferr[chunk],
-                                       qual[chunk],
-                                       (p[chunk] for p in predictors)))
+        lc = LightCurve(time[chunk], flux[chunk], ferr[chunk], qual[chunk],
+                        (p[chunk] for p in predictors))
+        if len(lc.time) < min_length:
+            continue
+        light_curves.append(lc)
 
     return light_curves
 
