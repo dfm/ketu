@@ -38,7 +38,7 @@ parser.add_argument("--durations", nargs="+", type=float,
                     help="the durations to test")
 parser.add_argument("--min-period", type=float, default=50.0,
                     help="minimum period")
-parser.add_argument("--max-period", type=float, default=750.0,
+parser.add_argument("--max-period", type=float, default=725.0,
                     help="maximum period")
 
 args = parser.parse_args()
@@ -66,6 +66,10 @@ stars = pd.read_hdf(os.path.join(os.path.dirname(bp), "data", "best42k.h5"),
                     "best42k")
 nstars = len(stars)
 
+# Empirical multiplicity distribution.
+multi = np.array([2544., 430., 145., 55., 18., 4.])
+multi /= np.sum(multi)
+
 # Loop over N stars and generate some injections.
 for i in np.random.randint(nstars, size=args.total_number):
     a = copy.copy(args)
@@ -83,9 +87,7 @@ for i in np.random.randint(nstars, size=args.total_number):
     for j in range(args.n_injections):
         a.results_root = os.path.join(args.results_root,
                                       "{0}-inj-{1}".format(kicid, j))
-        k = np.random.poisson(3)
-        while k <= 0:
-            k = np.random.poisson(3)
+        k = np.argmax(np.random.multinomial(1, multi)) + 1
         a.injections = k
         print(a.injections)
         main(vars(a))
