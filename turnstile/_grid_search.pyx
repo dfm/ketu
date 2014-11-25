@@ -21,6 +21,7 @@ cdef int evaluate_single(double alpha, double period, double t0,
                          int* inds):
     cdef double t
     cdef int k, ind, nind
+    nind = 0
 
     # Initialize the results array at zero.
     for k in range(nduration):
