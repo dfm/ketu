@@ -81,43 +81,7 @@ class LCWrapper(object):
 
         return dll, d, S
 
-    def linear_maximum_likelihood(self, model=None, order=2, y=None):
+    def predict(self, y=None):
         if y is None:
             y = self.flux
-
-        if model is None:
-            model = np.zeros_like(self.time)
-            order = 1
-        else:
-            model = model(self.time)
-        m = np.vander(model, order)
-        mT = m.T
-
-        # Precompute some useful factors.
-        Cf = self.gp.solver.apply_inverse(y)
-        Cm = self.gp.solver.apply_inverse(m)
-        S = np.atleast_2d(np.dot(m, Cm))
-
-        # Solve for the maximum likelihood model.
-        factor = cho_factor(S, overwrite_a=True)
-        w = cho_solve(factor, np.dot(mT, Cf), overwrite_b=True)
-        sigma = cho_solve(factor, np.eye(len(S)), overwrite_b=True)
-
-        return w, m, sigma, Cf, Cm
-
-    def predict(self, model=None, order=2, y=None):
-        try:
-            w, m, sigma, Cf, Cm = \
-                self.linear_maximum_likelihood(model, order, y=y)
-        except LinAlgError:
-            w, m, sigma, Cf, Cm = self.linear_maximum_likelihood(y=y)
-
-        if len(w) > 1:
-            sig = m[:, 0] * w[0]
-            bkg = m[:, 1] * w[1]
-        else:
-            bkg = m[:, 0] * w[0]
-            sig = np.zeros_like(bkg)
-
-        return sig, bkg + np.dot(self.kernel.value(self.gp._x),
-                                 Cf - np.dot(Cm, w))
+        return self.gp.predict(y, self.time, mean_only=True)

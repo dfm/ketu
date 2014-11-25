@@ -84,7 +84,7 @@ class FeatureExtract(Pipeline):
                 m = np.fabs(t) < dt
                 if not np.any(m):
                     continue
-                mean, bkg = lc.predict(y=lc.flux - model(t))
+                bkg = lc.predict(y=lc.flux - model(t))
 
                 # Compute the transit number for each point.
                 trans_num = np.round((lc.time[m] - t0) / period).astype(int)

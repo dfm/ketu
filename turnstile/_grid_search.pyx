@@ -77,7 +77,7 @@ cdef int evaluate_single(double alpha, double period, double t0,
 
         # If there was any measurement for the depth, update the
         # single depth model.
-        if depth_ivar_2d[k] > 0 and nind > 2:
+        if depth_ivar_2d[k] > 0 and nind >= 3:
             depth_2d[k] /= depth_ivar_2d[k]
 
             # Loop over the saved list of transit times and evaluate

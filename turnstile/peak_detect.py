@@ -54,17 +54,8 @@ class PeakDetect(Pipeline):
 
         # Start by fitting out the background level.
         tmx, tmn = parent_response.max_time_1d, parent_response.min_time_1d
-        ttot = tmx - tmn
         periods = parent_response.period_2d
-
-        # Do a linear fit of the form: sqrt(N / P).
-        bkg = np.vstack((
-            np.sqrt(np.ceil(ttot / periods)) / np.sqrt(periods),
-            np.ones_like(periods),
-        ))
-        w = np.linalg.solve(np.dot(bkg, bkg.T), np.dot(bkg, phic_same))
-        bkg = np.dot(w, bkg)
-        z = phic_same - bkg
+        z = phic_same
 
         # Compute the RMS noise in this object.
         rms = np.sqrt(np.median(z ** 2))
@@ -103,7 +94,7 @@ class PeakDetect(Pipeline):
             period=periods[i], t0=t0s[i], phic_same=phic_same[i],
             delta_phic=phic_same[i] - phic_same_2[i],
             curve_phic=compute_curvature(z, periods, i),
-            phic_variable=phic_variable[i], scaled_phic_same=z[i],
+            phic_variable=phic_variable[i],
             depth=depth[i], depth_ivar=depth_ivar[i],
             depth_s2n=depth[i]*np.sqrt(depth_ivar[i]), rms=rms,
             duration=duration[i],
@@ -111,7 +102,6 @@ class PeakDetect(Pipeline):
 
         return dict(
             periods=periods,
-            scaled_phic_same=z,
             rms=rms,
             peaks=peaks,
         )
@@ -133,9 +123,6 @@ class PeakDetect(Pipeline):
             f.attrs["rms"] = response["rms"]
             f.create_dataset("periods", data=response["periods"],
                              compression="gzip")
-            f.create_dataset("scaled_phic_same",
-                             data=response["scaled_phic_same"],
-                             compression="gzip")
             f.create_dataset("peaks", data=peaks, compression="gzip")
 
     def load_from_cache(self, fn):
@@ -146,7 +133,6 @@ class PeakDetect(Pipeline):
                              for peak in f["peaks"]]
                     return dict(
                         periods=f["periods"][...],
-                        scaled_phic_same=f["scaled_phic_same"][...],
                         rms=f.attrs["rms"],
                         peaks=peaks,
                     )

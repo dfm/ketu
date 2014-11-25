@@ -67,15 +67,20 @@ class Validate(Pipeline):
         fig = pl.figure(figsize=(10, 4))
         ax = fig.add_subplot(111)
         x = parent_response.periods
-        y = parent_response.scaled_phic_same
-        ax.plot(x, y, "k")
+        y = np.max(parent_response.phic_same, axis=1)
+        m = np.isfinite(y)
+        ax.plot(x[m], y[m], "k")
         for i, peak in enumerate(peaks):
-            x0, y0 = peak["period"], peak["scaled_phic_same"]
+            x0, y0 = peak["period"], peak["phic_same"]
             ax.plot(x0, y0, ".r")
             ax.annotate("{0}".format(i), xy=(x0, y0), ha="center",
                         xytext=(0, 5), textcoords="offset points")
+
+        for inj in query.get("injections", []):
+            ax.axvline(inj["period"], color="b", lw=3, alpha=0.3)
+
         ax.set_xlim(min(x), max(x))
-        ax.set_ylim(min(y), 1.1 * max(y))
+        ax.set_ylim(min(y[m]), 1.1 * max(y[m]))
         ax.set_xlabel("period")
         ax.set_ylabel("PHIC")
         ax.set_title("periodogram")
