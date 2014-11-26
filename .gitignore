@@ -13,3 +13,9 @@ dist
 build
 scripts/turnstile.o*
 runs
+.ipynb_checkpoints
+*.ipynb
+data/*.h5
+collected
+mercer
+tmp_cache
