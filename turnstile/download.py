@@ -55,7 +55,7 @@ class Download(Pipeline):
     query_parameters = {
         "kicid": (None, True),
         "short_cadence": (False, False),
-        "npredictor": (50, False),
+        "npredictor": (0, False),
         "data_root": (None, False),
     }
 
