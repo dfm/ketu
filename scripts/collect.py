@@ -14,7 +14,7 @@ import matplotlib.pyplot as pl
 from numpy.lib import recfunctions
 
 
-with h5py.File("completeness.h5", "r") as f:
+with h5py.File("data/completeness.h5", "r") as f:
     bins = [f["ln_period_bin_edges"][...],
             f["ln_radius_bin_edges"][...]]
     lncompleteness = f["ln_completeness"][...]
@@ -77,7 +77,8 @@ if __name__ == "__main__":
                 peak = dict(g.attrs)
                 if dtype is None:
                     dtype = [(str(c), float) for c in sorted(peak.keys())
-                             if not c.startswith("is_")]
+                             if not (c.startswith("is_") or
+                                     c.startswith("injected_"))]
                     dtype = dtype + [("is_injection", bool), ("is_koi", bool)]
                     colnames = [c for c, _ in dtype]
                     dtype = zip(extracols, [int, float, float, float]) + dtype

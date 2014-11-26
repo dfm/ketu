@@ -6,7 +6,6 @@ __all__ = ["GPLikelihood"]
 
 import numpy as np
 from emcee.autocorr import integrated_time
-from scipy.linalg import cho_factor, cho_solve, LinAlgError
 
 import george
 from george.kernels import ExpSquaredKernel

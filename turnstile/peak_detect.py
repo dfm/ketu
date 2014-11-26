@@ -57,6 +57,12 @@ class PeakDetect(Pipeline):
         periods = parent_response.period_2d
         z = phic_same
 
+        # Now we'll fit out the 1/period trend.
+        A = np.vander(1.0 / periods, 2)
+        ATA = np.dot(A.T, A)
+        w = np.linalg.solve(ATA, np.dot(A.T, z))
+        z -= np.dot(A, w)
+
         # Compute the RMS noise in this object.
         rms = np.sqrt(np.median(z ** 2))
 
@@ -94,7 +100,7 @@ class PeakDetect(Pipeline):
             period=periods[i], t0=t0s[i], phic_same=phic_same[i],
             delta_phic=phic_same[i] - phic_same_2[i],
             curve_phic=compute_curvature(z, periods, i),
-            phic_variable=phic_variable[i],
+            phic_variable=phic_variable[i], phic_norm=z[i],
             depth=depth[i], depth_ivar=depth_ivar[i],
             depth_s2n=depth[i]*np.sqrt(depth_ivar[i]), rms=rms,
             duration=duration[i],
@@ -102,6 +108,7 @@ class PeakDetect(Pipeline):
 
         return dict(
             periods=periods,
+            phic_scale=z,
             rms=rms,
             peaks=peaks,
         )
@@ -123,6 +130,8 @@ class PeakDetect(Pipeline):
             f.attrs["rms"] = response["rms"]
             f.create_dataset("periods", data=response["periods"],
                              compression="gzip")
+            f.create_dataset("phic_scale", data=response["phic_scale"],
+                             compression="gzip")
             f.create_dataset("peaks", data=peaks, compression="gzip")
 
     def load_from_cache(self, fn):
@@ -133,6 +142,7 @@ class PeakDetect(Pipeline):
                              for peak in f["peaks"]]
                     return dict(
                         periods=f["periods"][...],
+                        phic_scale=f["phic_scale"][...],
                         rms=f.attrs["rms"],
                         peaks=peaks,
                     )

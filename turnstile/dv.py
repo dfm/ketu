@@ -67,7 +67,7 @@ class Validate(Pipeline):
         fig = pl.figure(figsize=(10, 4))
         ax = fig.add_subplot(111)
         x = parent_response.periods
-        y = np.max(parent_response.phic_same, axis=1)
+        y = parent_response.phic_scale
         m = np.isfinite(y)
         ax.plot(x[m], y[m], "k")
         for i, peak in enumerate(peaks):
