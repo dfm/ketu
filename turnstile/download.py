@@ -28,24 +28,29 @@ def prepare_download(query, fetch=True):
 
     # Find predictor stars sorted by distance. TODO: try other sets.
     npredictor = query["npredictor"]
-    print("Downloading predictor light curves")
-    q = dict(
-        ktc_kepler_id="!={0:d}".format(kicid),
-        ra=kic.kic_degree_ra, dec=kic.kic_dec, radius=1000,
-        ktc_target_type="LC", max_records=npredictor, fetch=fetch,
-    )
-    predictor_lcs = []
-    for lc in data:
-        sys.stdout.write(".")
-        sys.stdout.flush()
-        q["sci_data_quarter"] = lc.sci_data_quarter
-        predictor_lcs += [client.light_curves(**q)]
-    print()
+    if npredictor > 0:
+        print("Downloading predictor light curves")
+        q = dict(
+            ktc_kepler_id="!={0:d}".format(kicid),
+            ra=kic.kic_degree_ra, dec=kic.kic_dec, radius=1000,
+            ktc_target_type="LC", max_records=npredictor, fetch=fetch,
+        )
+        predictor_lcs = []
+        for lc in data:
+            sys.stdout.write(".")
+            sys.stdout.flush()
+            q["sci_data_quarter"] = lc.sci_data_quarter
+            predictor_lcs += [client.light_curves(**q)]
+        print()
 
-    # Work out all of the KIC IDs that we'll touch.
-    kicids = (set(["{0:09d}".format(int(kicid))])
-              | set(lc.kepid for quarter in predictor_lcs
-                    for lc in quarter))
+        # Work out all of the KIC IDs that we'll touch.
+        kicids = (set(["{0:09d}".format(int(kicid))])
+                  | set(lc.kepid for quarter in predictor_lcs
+                        for lc in quarter))
+
+    else:
+        predictor_lcs = [[] for i in range(len(data))]
+        kicids = set(["{0:09d}".format(int(kicid))])
 
     return kicids, kic, data, predictor_lcs
 

@@ -55,13 +55,12 @@ class PeakDetect(Pipeline):
         # Start by fitting out the background level.
         tmx, tmn = parent_response.max_time_1d, parent_response.min_time_1d
         periods = parent_response.period_2d
-        z = phic_same
 
         # Now we'll fit out the 1/period trend.
         A = np.vander(1.0 / periods, 2)
         ATA = np.dot(A.T, A)
-        w = np.linalg.solve(ATA, np.dot(A.T, z))
-        z -= np.dot(A, w)
+        w = np.linalg.solve(ATA, np.dot(A.T, phic_same))
+        z = phic_same - np.dot(A, w)
 
         # Compute the RMS noise in this object.
         rms = np.sqrt(np.median(z ** 2))

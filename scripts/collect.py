@@ -44,7 +44,8 @@ if __name__ == "__main__":
     # Loop over results directories.
     dtype = None
     injections = []
-    features = []
+    noinj_features = []
+    inj_features = []
     for d in glob.iglob(args.pattern):
         feat_fn = os.path.join(d, "results", "features.h5")
         if not os.path.exists(feat_fn):
@@ -83,13 +84,20 @@ if __name__ == "__main__":
                     colnames = [c for c, _ in dtype]
                     dtype = zip(extracols, [int, float, float, float]) + dtype
                     dtype = np.dtype(dtype)
-                features.append(tuple(extra + [peak[c] for c in colnames]))
+                if len(inj_rec):
+                    inj_features.append(tuple(extra
+                                              + [peak[c] for c in colnames]))
+                else:
+                    noinj_features.append(tuple(extra +
+                                                [peak[c] for c in colnames]))
 
     # Save the features.
-    features = np.array(features, dtype=dtype)
-    print(len(features))
+    inj_features = np.array(inj_features, dtype=dtype)
+    noinj_features = np.array(noinj_features, dtype=dtype)
+    print(len(inj_features))
     with h5py.File(os.path.join(args.results, "features.h5"), "w") as f:
-        f.create_dataset("features", data=features)
+        f.create_dataset("inj_features", data=inj_features)
+        f.create_dataset("noinj_features", data=noinj_features)
 
     dtype = injections[0].dtype
     injections = np.array(np.concatenate(injections, axis=0), dtype=dtype)

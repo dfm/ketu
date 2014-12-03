@@ -98,7 +98,8 @@ class LightCurve(object):
                 y[bad] = np.interp(x[bad], x[~bad], y[~bad])
             y /= np.median(y)
             self.predictors.append(y)
-        self.predictors = np.vstack(self.predictors).T
+        if len(self.predictors):
+            self.predictors = np.vstack(self.predictors).T
 
     def __len__(self):
         return len(self.time)
