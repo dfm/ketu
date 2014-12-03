@@ -46,6 +46,7 @@ def prepare(kicid, archive_root, results_root, injections=None,
         q = dict(q, **injections)
 
     pipe = turnstile.Prepare(pipe, cache=False)
+    pipe = turnstile.Discontinuity(pipe, cache=False)
     pipe = turnstile.GPLikelihood(pipe, cache=False)
     pipe = turnstile.OneDSearch(pipe, clobber=True)
     pipe = turnstile.TwoDSearch(pipe, cache=False)
