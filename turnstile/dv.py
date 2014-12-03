@@ -71,7 +71,7 @@ class Validate(Pipeline):
         m = np.isfinite(y)
         ax.plot(x[m], y[m], "k")
         for i, peak in enumerate(peaks):
-            x0, y0 = peak["period"], peak["phic_same"]
+            x0, y0 = peak["period"], peak["phic_norm"]
             ax.plot(x0, y0, ".r")
             ax.annotate("{0}".format(i), xy=(x0, y0), ha="center",
                         xytext=(0, 5), textcoords="offset points")
@@ -181,3 +181,5 @@ class Validate(Pipeline):
         # Save the pipeline.
         with open(os.path.join(bp, "pipeline.pkl"), "wb") as f:
             pickle.dump(self, f, -1)
+
+        return dict()
