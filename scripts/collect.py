@@ -76,6 +76,9 @@ if __name__ == "__main__":
                     continue
                 g = f[nm]
                 peak = dict(g.attrs)
+
+                lc = g["bin_lc"][...]
+
                 if dtype is None:
                     dtype = [(str(c), float) for c in sorted(peak.keys())
                              if not (c.startswith("is_") or
@@ -83,13 +86,21 @@ if __name__ == "__main__":
                     dtype = dtype + [("is_injection", bool), ("is_koi", bool)]
                     colnames = [c for c, _ in dtype]
                     dtype = zip(extracols, [int, float, float, float]) + dtype
+                    dtype += [("lc_{0}".format(i), float)
+                              for i in range(len(lc))]
+                    dtype += [("lc_err_{0}".format(i), float)
+                              for i in range(len(lc))]
                     dtype = np.dtype(dtype)
                 if len(inj_rec):
                     inj_features.append(tuple(extra
-                                              + [peak[c] for c in colnames]))
+                                              + [peak[c] for c in colnames])
+                                        + tuple(lc["flux"])
+                                        + tuple(lc["flux_err"]))
                 else:
                     noinj_features.append(tuple(extra +
-                                                [peak[c] for c in colnames]))
+                                                [peak[c] for c in colnames])
+                                          + tuple(lc["flux"])
+                                          + tuple(lc["flux_err"]))
 
     # Save the features.
     inj_features = np.array(inj_features, dtype=dtype)
