@@ -2,7 +2,7 @@
 #PBS -l nodes=8:ppn=20
 #PBS -l walltime=12:00:00
 #PBS -l mem=350GB
-#PBS -N turnstile
+#PBS -N turnstile-{rnd}
 #PBS -m ae
 #PBS -M danfm@nyu.edu
 #PBS -j oe

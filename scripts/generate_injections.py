@@ -9,7 +9,9 @@ bp = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, bp)
 from prepare import main
 
+import time
 import copy
+import hashlib
 import argparse
 import numpy as np
 import pandas as pd
@@ -59,6 +61,7 @@ with open(args.pbs_template, "r") as f:
 with open(os.path.join(args.results_root, "job.pbs"), "w") as f:
     f.write(template.format(
         results_root=os.path.abspath(args.results_root),
+        rnd=hashlib.md5(str(time.time())).hexdigest(),
     ))
 
 # Load the stellar sample.
