@@ -57,13 +57,15 @@ class PeakDetect(Pipeline):
         periods = parent_response.period_2d
 
         # Now we'll fit out the 1/period trend.
-        A = np.vander(1.0 / periods, 2)
+        m = np.isfinite(phic_same)
+        A = np.vander(1.0 / periods[m], 2)
         ATA = np.dot(A.T, A)
-        w = np.linalg.solve(ATA, np.dot(A.T, phic_same))
-        z = phic_same - np.dot(A, w)
+        w = np.linalg.solve(ATA, np.dot(A.T, phic_same[m]))
+        z = -np.inf + np.zeros_like(phic_same)
+        z[m] = phic_same[m] - np.dot(A, w)
 
         # Compute the RMS noise in this object.
-        rms = np.sqrt(np.median(z ** 2))
+        rms = np.sqrt(np.median(z[m] ** 2))
 
         # Find the peaks.
         peak_inds = (z[1:-1] > z[:-2]) * (z[1:-1] > z[2:])
