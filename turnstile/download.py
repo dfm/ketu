@@ -20,6 +20,10 @@ def prepare_download(query, fetch=True):
     kic = client.star(kicid)
     kic.kois
 
+    # Get the entry in the Huber et al. catalog.
+    hcat = kplr.huber.get_catalog()
+    kic.huber = hcat[hcat.KIC == kicid].iloc[0]
+
     # Download the light curves.
     short_cadence = query["short_cadence"]
     data = kic.get_light_curves(short_cadence=short_cadence, fetch=fetch)
