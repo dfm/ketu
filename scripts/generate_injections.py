@@ -23,7 +23,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("total_number", type=int,
                     help="the number of stars to test")
 parser.add_argument("archive_root",
-                    help="the current location of the data")
+                    help="the location of the data")
 parser.add_argument("results_root", help="the results location")
 
 parser.add_argument("-t", "--pbs-template",
@@ -79,7 +79,7 @@ for i in np.random.randint(nstars, size=args.total_number):
 
     star = stars[i:i+1]
     kicid = int(star["kic"])
-    print(kicid)
+    print(kicid, end=" ")
     a.kicid = kicid
     a.rstar = float(star["Rstar"])
     a.mstar = float(star["Mstar"])
@@ -92,5 +92,6 @@ for i in np.random.randint(nstars, size=args.total_number):
                                       "{0}-inj-{1}".format(kicid, j))
         k = np.argmax(np.random.multinomial(1, multi)) + 1
         a.injections = k
-        print(a.injections)
+        print(a.injections, end=" ")
         main(vars(a))
+    print()
