@@ -52,11 +52,13 @@ def prepare_characterization(kicid, periods, time0s, rors, impacts,
             lc.texp = kplr.EXPOSURE_TIMES[1] / 86400.0
 
             # Heuristically guess the Gaussian Process parameters.
-            kernel = np.median((lc.flux-1.0)**2)*kernels.Matern32Kernel(2.0)
+            lc.factor = 1000.0
+            amp = np.median((lc.factor * (lc.flux-1.0))**2)
+            kernel = amp*kernels.Matern32Kernel(4.0)
             lc.gp = george.GP(kernel)
 
             # Run an initial computation of the GP.
-            lc.gp.compute(lc.time, lc.ferr)
+            lc.gp.compute(lc.time, lc.ferr * lc.factor)
 
             # Save this light curve.
             lcs.append(lc)
@@ -93,20 +95,25 @@ class ProbabilisticModel(object):
         self.system = system
         self.lnsr = lnsr
         self.lnsm = lnsm
+        self.fit_star = False
 
     def pack(self):
         star = self.system.central
         planets = self.system.bodies
-        return np.array(list(self.lcs[0].gp.kernel.vector) + [
-            np.log(star.radius),
-            np.log(star.mass),
+
+        vec = list(self.lcs[0].gp.kernel.vector)
+        if self.fit_star:
+            vec += [np.log(star.radius), np.log(star.mass)]
+        vec += [
             star.q1,
             star.q2,
-        ] + [v for p in planets for v in (
+        ]
+        vec += [v for p in planets for v in (
             np.log(p.r), np.log(p.period), p.t0, p.b,
             np.sqrt(p.e) * np.sin(p.pomega),
             np.sqrt(p.e) * np.cos(p.pomega)
-        )])
+        )]
+        return np.array(vec)
 
     def unpack(self, pars):
         # Update the kernel.
@@ -116,8 +123,9 @@ class ProbabilisticModel(object):
 
         # Update the star.
         star = self.system.central
-        star.radius, star.mass = np.exp(pars[i:i+2])
-        i += 2
+        if self.fit_star:
+            star.radius, star.mass = np.exp(pars[i:i+2])
+            i += 2
         star.q1, star.q2 = pars[i:i+2]
         i += 2
 
@@ -158,7 +166,7 @@ class ProbabilisticModel(object):
         ll = 0.0
         for lc in self.lcs:
             mu = self.system.light_curve(lc.time, texp=lc.texp)
-            r = lc.flux - mu
+            r = (lc.flux - mu) * lc.factor
             ll += lc.gp.lnlikelihood(r, quiet=True)
             if not np.isfinite(ll):
                 return -np.inf
@@ -188,8 +196,8 @@ class ProbabilisticModel(object):
             ax.plot(t, lc.flux + i*dy, ".k", alpha=0.5)
 
             mu = self.system.light_curve(lc.time, texp=lc.texp)
-            r = lc.flux - mu
-            pred = lc.gp.predict(r, lc.time, mean_only=True)
+            r = lc.factor * (lc.flux - mu)
+            pred = lc.gp.predict(r, lc.time, mean_only=True) / lc.factor
             ax.plot(t, pred + mu + i*dy, "b", alpha=0.5)
 
         ax.axvline(0.0, color="k", alpha=0.3, lw=3)
