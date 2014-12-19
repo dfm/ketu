@@ -146,6 +146,8 @@ if __name__ == "__main__":
 
         with sqlite3.connect(dbfn) as conn:
             c = conn.cursor()
+            c.execute("update stars set started=?,ninj=? where kic=?",
+                      (True, args.ninj, row["kic"]))
 
     # Monitor the jobs and check for completion and errors.
     retrieved = [False] * len(jobs)
@@ -161,5 +163,9 @@ if __name__ == "__main__":
                 else:
                     with open(os.path.join(fn, "success.log"), "w") as f:
                         f.write("Finished at: {0}\n".format(time.time()))
+                    with sqlite3.connect(dbfn) as conn:
+                        c = conn.cursor()
+                        c.execute("update stars set finished=? where kic=?",
+                                  (True, row["kic"]))
                 retrieved[i] = True
         time.sleep(1)
