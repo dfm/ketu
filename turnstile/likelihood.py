@@ -42,7 +42,9 @@ class LCWrapper(object):
 
         # Hackishly build a kernel.
         tau = np.median(np.diff(self.time)) * integrated_time(self.flux)
-        self.kernel = np.var(self.flux) * ExpSquaredKernel(tau ** 2)
+        tau = max(0.5, tau)  # Tau should be floored.
+        amp = np.median((self.flux - np.median(self.flux))**2)
+        self.kernel = amp * ExpSquaredKernel(tau ** 2)
         self.gp = george.GP(self.kernel, solver=george.HODLRSolver)
         self.gp.compute(self.time, self.ferr, seed=1234)
 
