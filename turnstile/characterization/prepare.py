@@ -165,7 +165,10 @@ class ProbabilisticModel(object):
     def lnlike(self):
         ll = 0.0
         for lc in self.lcs:
-            mu = self.system.light_curve(lc.time, texp=lc.texp)
+            try:
+                mu = self.system.light_curve(lc.time, texp=lc.texp)
+            except RuntimeError:
+                return -np.inf
             r = (lc.flux - mu) * lc.factor
             ll += lc.gp.lnlikelihood(r, quiet=True)
             if not np.isfinite(ll):

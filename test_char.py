@@ -44,9 +44,6 @@ for kepid in set(kois.kepid):
     except os.error:
         pass
 
-    with open(os.path.join(OUTDIR, "model.pkl"), "wb") as f:
-        pickle.dump(model, f, -1)
-
     p0 = model.pack()
     model.unpack(p0)
     assert np.allclose(p0, model.pack())
@@ -97,9 +94,22 @@ for kepid in set(kois.kepid):
     pos, lp, _ = sampler.run_mcmc(pos, 5000)
     sampler.reset()
 
+    p = pos[np.argmax(lp)]
+    model.unpack(p)
+    fig = model.plot(dy=1e-3)
+    fig.savefig(os.path.join(OUTDIR, "plot-mid.png"))
+
     print("Production run")
     pos, lp, _ = sampler.run_mcmc(pos, 20000)
 
     with h5py.File(os.path.join(OUTDIR, "results.h5"), "w") as f:
         f.create_dataset("chain", data=sampler.chain)
         f.create_dataset("lnp", data=sampler.lnprobability)
+
+    with open(os.path.join(OUTDIR, "model.pkl"), "wb") as f:
+        pickle.dump(model, f, -1)
+
+    p = pos[np.argmax(lp)]
+    model.unpack(p)
+    fig = model.plot(dy=1e-3)
+    fig.savefig(os.path.join(OUTDIR, "plot-final.png"))
