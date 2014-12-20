@@ -201,6 +201,7 @@ class ProbabilisticModel(object):
             mu = self.system.light_curve(lc.time, texp=lc.texp)
             r = lc.factor * (lc.flux - mu)
             pred = lc.gp.predict(r, lc.time, mean_only=True) / lc.factor
+            ax.plot(t, pred + 1.0 + i*dy, "r", alpha=0.5)
             ax.plot(t, pred + mu + i*dy, "b", alpha=0.5)
 
         ax.axvline(0.0, color="k", alpha=0.3, lw=3)

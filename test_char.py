@@ -33,10 +33,10 @@ for kepid in set(kois.kepid):
         np.array(koi.koi_time0bk % koi.koi_period),
         np.array(koi.koi_ror),
         np.array(koi.koi_impact),
-        es=np.array(koi.koi_eccen) + 1e-4)
+        es=np.array(koi.koi_eccen) + 0.1 + 1e-4)
 
     OUTDIR = "characterization/{0}".format(kepid)
-    if os.path.exists(OUTDIR):
+    if os.path.exists(os.path.join(OUTDIR, "results.h5")):
         print("skipping")
         continue
     try:
@@ -62,7 +62,7 @@ for kepid in set(kois.kepid):
     view.push({"lnprob": lnprob, "model": model})
 
     ndim, nwalkers = len(p0), 36
-    pos = [p0 + 1e-5 * np.random.randn(ndim) for w in range(nwalkers)]
+    pos = [p0 + 1e-8 * np.random.randn(ndim) for w in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, pool=view)
 
     print(list(view.map(lnprob, pos)))
@@ -79,7 +79,7 @@ for kepid in set(kois.kepid):
     assert np.allclose(p0, model.pack())
 
     ndim, nwalkers = len(p0), 36
-    pos = [p0 + 1e-5 * np.random.randn(ndim) for w in range(nwalkers)]
+    pos = [p0 + 1e-8 * np.random.randn(ndim) for w in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, pool=view)
 
     view.push({"lnprob": lnprob, "model": model})
@@ -87,7 +87,7 @@ for kepid in set(kois.kepid):
     pos, lp, _ = sampler.run_mcmc(pos, 1000)
 
     p0 = pos[np.argmax(lp)]
-    pos = [p0 + 1e-5 * np.random.randn(ndim) for w in range(nwalkers)]
+    pos = [p0 + 1e-8 * np.random.randn(ndim) for w in range(nwalkers)]
     sampler.reset()
 
     print("Final burn-in")
