@@ -81,7 +81,7 @@ if __name__ == "__main__":
     parser.add_argument("--durations", nargs="+", type=float,
                         default=[0.2, 0.4, 0.6],
                         help="the durations to test")
-    parser.add_argument("--min-period", type=float, default=50.0,
+    parser.add_argument("--min-period", type=float, default=100.0,
                         help="minimum period")
     parser.add_argument("--max-period", type=float, default=725.0,
                         help="maximum period")

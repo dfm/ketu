@@ -2,7 +2,7 @@
 #PBS -l nodes=8:ppn=20
 #PBS -l walltime=12:00:00
 #PBS -l mem=350GB
-#PBS -N turnstile-{rnd}
+#PBS -N turnstile
 #PBS -m ae
 #PBS -M danfm@nyu.edu
 #PBS -j oe
@@ -16,7 +16,7 @@ export TURNSTILE_PATH=$WORK/turnstile/cache
 
 # Locations.
 export SRCDIR=$HOME/projects/turnstile
-export RUNDIR={results_root}
+export RUNDIR=$WORK/turnstile/bright_g_stars
 export PROFILEDIR=$RUNDIR/profile
 mkdir -p $RUNDIR
 cd $RUNDIR
@@ -36,7 +36,7 @@ done
 
 if (( success )); then
     # Run the analysis.
-    python $SRCDIR/scripts/search.py "{results_root}/*/pipeline.pkl" --profile-dir $PROFILEDIR &> output.log
+    python $SRCDIR/scripts/search.py $RUNDIR 2000 $SCRATCH/data/lightcurves --profile-dir $PROFILEDIR &> output.log
 else
     echo "Server never started" &> output.log
 fi
