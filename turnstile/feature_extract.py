@@ -145,8 +145,9 @@ class FeatureExtract(Pipeline):
             peaks.append(peak)
 
         return dict(inj_rec=inj_rec, koi_rec=koi_rec, features=peaks,
-                    kic_kepmag=kic.kic_kepmag, kic_teff=kic.kic_teff,
-                    kic_logg=kic.kic_logg)
+                    kic_kepmag=kic.kic_kepmag,
+                    kic_teff=kic.huber.Teff,
+                    kic_logg=kic.huber["log(g)"])
 
     def save_to_cache(self, fn, response):
         try:
