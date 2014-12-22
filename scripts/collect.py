@@ -48,11 +48,11 @@ if __name__ == "__main__":
     inj_features = []
     for d in glob.iglob(args.pattern):
         feat_fn = os.path.join(d, "results", "features.h5")
-        if not os.path.exists(feat_fn):
+        q_fn = os.path.join(d, "results", "query.json")
+        if not os.path.exists(feat_fn) or not os.path.exists(q_fn):
             print("Skipping {0}".format(d))
             continue
 
-        q_fn = os.path.join(d, "results", "query.json")
         with open(q_fn, "r") as f:
             data = json.load(f)
             kicid = data["kicid"]
