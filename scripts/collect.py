@@ -106,6 +106,8 @@ if __name__ == "__main__":
     # Make sure that NaNs become Falses when they should.
     all_features["injected_rec"] = [v if np.isfinite(v) else False
                                     for v in all_features["injected_rec"]]
+    all_features["koi_rec"] = [v if np.isfinite(v) else False
+                               for v in all_features["koi_rec"]]
 
     # Save the feature DataFrame.
     features = pd.DataFrame(all_features)
