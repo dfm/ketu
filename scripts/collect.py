@@ -72,6 +72,7 @@ if __name__ == "__main__":
             extra += [(len(inj_rec) > 0), d]
 
             # Loop over the peaks and save the features.
+            peakid = 0
             for nm in f:
                 # Skip non-peak datasets.
                 if not nm.startswith("peak_"):
@@ -98,9 +99,11 @@ if __name__ == "__main__":
 
                 # Choose the column names to loop over.
                 cols = set(peak.keys() + all_features.keys())
-                cols -= set(["kicid"] + to_skip + extracols)
+                cols -= set(["kicid", "peakid"] + to_skip + extracols)
                 for k in cols:
                     all_features[str(k)].append(peak.get(k, np.nan))
+                all_features["peakid"].append(peakid)
+                peakid += 1
                 all_features["kicid"].append(kicid)
 
     # Make sure that NaNs become Falses when they should.
