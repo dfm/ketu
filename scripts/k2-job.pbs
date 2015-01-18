@@ -32,7 +32,7 @@ done
 
 if (( success )); then
     # Run the analysis.
-    python $SRCDIR/scripts/k2_search.py "$WORK/k2/data/c1/*/*.fits" $WORK/k2/data/c1-basis.h5 $RUNDIR --profile-dir $PROFILEDIR &> output.log
+    python $SRCDIR/scripts/k2_search.py "$WORK/k2/data/c1/*/*/*.fits" $WORK/k2/data/c1-basis.h5 $RUNDIR --profile-dir $PROFILEDIR &> output.log
 else
     echo "Server never started" &> output.log
 fi

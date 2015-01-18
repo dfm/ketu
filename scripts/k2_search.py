@@ -68,7 +68,6 @@ if __name__ == "__main__":
     parser.add_argument("file_glob", help="pattern for the LC files")
     parser.add_argument("basis_file", help="the archive of PCA comps")
     parser.add_argument("base_dir", help="the directory for output")
-    parser.add_argument("njobs", type=int, help="the number of jobs to run")
     parser.add_argument("--min-period", type=float, default=5.0,
                         help="minimum period")
     parser.add_argument("--max-period", type=float, default=80.0,
