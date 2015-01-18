@@ -19,3 +19,4 @@ data/*.h5
 collected
 mercer
 tmp_cache
+scripts/jobs

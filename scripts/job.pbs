@@ -2,7 +2,7 @@
 #PBS -l nodes=8:ppn=20
 #PBS -l walltime=12:00:00
 #PBS -l mem=350GB
-#PBS -N turnstile
+#PBS -N turnstile-{idhash}
 #PBS -m ae
 #PBS -M danfm@nyu.edu
 #PBS -j oe
@@ -17,17 +17,17 @@ export TURNSTILE_PATH=$WORK/turnstile/cache
 # Locations.
 export SRCDIR=$HOME/projects/turnstile
 export RUNDIR=$WORK/turnstile/bright_g_stars
-export PROFILEDIR=$RUNDIR/profile
+export PROFILEDIR=$RUNDIR/profile-{idhash}
 mkdir -p $RUNDIR
 cd $RUNDIR
 
 # Set up and start the IPython cluster.
 cp -r $HOME/.ipython/profile_mpi $PROFILEDIR
-ipcluster start -n $PBS_NP --profile-dir=$PROFILEDIR &> ipcluster.log &
+ipcluster start -n $PBS_NP --profile-dir=$PROFILEDIR &> ipcluster-{idhash}.log &
 
 sleep 5
 for (( try=0; try < 100; ++try )); do
-    if cat ipcluster.log | grep -q "Engines appear to have started successfully"; then
+    if cat ipcluster-{idhash}.log | grep -q "Engines appear to have started successfully"; then
         success=1
         break
     fi
@@ -36,9 +36,9 @@ done
 
 if (( success )); then
     # Run the analysis.
-    python $SRCDIR/scripts/search.py $RUNDIR 2000 $SCRATCH/data/lightcurves --profile-dir $PROFILEDIR &> output.log
+    python $SRCDIR/scripts/search.py $RUNDIR 2000 $SCRATCH/data/lightcurves --ninj 5 --profile-dir $PROFILEDIR &> output-{idhash}.log
 else
-    echo "Server never started" &> output.log
+    echo "Server never started" &> output-{idhash}.log
 fi
 
 # Shut the cluster down.
