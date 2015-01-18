@@ -48,15 +48,20 @@ class FeatureExtract(Pipeline):
                             for inj in injections], dtype=dtype)
 
         # ... and the known KOIs.
-        kic = parent_response.star
-        kois = kic.kois
-        dtype = [("id", np.float32), ("period", np.float64),
-                 ("t0", np.float64), ("depth", np.float64),
-                 ("rec", bool)]
-        koi_rec = np.array([(float(k.kepoi_name[1:]), k.koi_period,
-                             k.koi_time0bk % k.koi_period, k.koi_depth,
-                             False)
-                            for k in kois], dtype=dtype)
+        try:
+            kic = parent_response.star
+        except AttributeError:
+            kic = None
+            koi_rec = np.array([], dtype=dtype)
+        else:
+            kois = kic.kois
+            dtype = [("id", np.float32), ("period", np.float64),
+                     ("t0", np.float64), ("depth", np.float64),
+                     ("rec", bool)]
+            koi_rec = np.array([(float(k.kepoi_name[1:]), k.koi_period,
+                                k.koi_time0bk % k.koi_period, k.koi_depth,
+                                False)
+                                for k in kois], dtype=dtype)
 
         # Choose the bin edges for the binned light curve.
         bin_edges = np.linspace(-dt, dt, float(bins+1), endpoint=True)
@@ -144,10 +149,18 @@ class FeatureExtract(Pipeline):
 
             peaks.append(peak)
 
-        return dict(inj_rec=inj_rec, koi_rec=koi_rec, features=peaks,
-                    kic_kepmag=kic.kic_kepmag,
-                    kic_teff=kic.huber.Teff,
-                    kic_logg=kic.huber["log(g)"])
+        results = dict(inj_rec=inj_rec, koi_rec=koi_rec, features=peaks)
+        if kic is not None:
+            results = dict(results,
+                           kic_kepmag=kic.kic_kepmag,
+                           kic_teff=kic.huber.Teff,
+                           kic_logg=kic.huber["log(g)"])
+        else:
+            results = dict(results,
+                           kic_kepmag=0.0,
+                           kic_teff=0.0,
+                           kic_logg=0.0)
+        return results
 
     def save_to_cache(self, fn, response):
         try:

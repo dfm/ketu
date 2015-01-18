@@ -12,7 +12,8 @@ if not __TURNSTILE_SETUP__:
                "Prepare", "Discontinuity", "Detrend", "GPLikelihood",
                "OneDSearch", "TwoDSearch", "PeakDetect", "FeatureExtract",
                "Validate",
-               "characterization"]
+               "characterization",
+               "K2Data", ]
 
     from .pipeline import Pipeline
     from .download import Download, PreparedDownload
@@ -28,3 +29,5 @@ if not __TURNSTILE_SETUP__:
     from .dv import Validate
 
     from . import characterization
+
+    from .k2_data import K2Data
