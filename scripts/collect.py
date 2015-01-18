@@ -9,15 +9,8 @@ import json
 import glob
 import h5py
 import numpy as np
-import scipy.ndimage
-import matplotlib.pyplot as pl
-from numpy.lib import recfunctions
-
-
-with h5py.File("data/completeness.h5", "r") as f:
-    bins = [f["ln_period_bin_edges"][...],
-            f["ln_radius_bin_edges"][...]]
-    lncompleteness = f["ln_completeness"][...]
+import pandas as pd
+from collections import defaultdict
 
 
 if __name__ == "__main__":
@@ -41,118 +34,90 @@ if __name__ == "__main__":
     except os.error:
         pass
 
-    # Loop over results directories.
-    dtype = None
-    injections = []
-    noinj_features = []
-    inj_features = []
-    for d in glob.iglob(args.pattern):
+    # Set up the dictionary that will be used for the pandas DataFrame
+    # creation.
+    all_features = defaultdict(lambda: [np.nan]*len(all_features["kicid"]))
+    all_features["kicid"] = []
+    all_injections = defaultdict(lambda: [np.nan]*len(all_injections["kicid"]))
+    all_injections["kicid"] = []
+
+    # Loop over the matching directories.
+    for ind, d in enumerate(glob.iglob(args.pattern)):
+        # Skip if any of the required files don't exist.
         feat_fn = os.path.join(d, "results", "features.h5")
-        if not os.path.exists(feat_fn):
+        q_fn = os.path.join(d, "query.json")
+        if not os.path.exists(feat_fn) or not os.path.exists(q_fn):
             print("Skipping {0}".format(d))
             continue
 
-        q_fn = os.path.join(d, "results", "query.json")
+        # Get the KIC ID.
         with open(q_fn, "r") as f:
             data = json.load(f)
             kicid = data["kicid"]
 
         with h5py.File(feat_fn, "r") as f:
+            # Get any injection information.
             inj_rec = f["inj_rec"][...]
             if len(inj_rec):
-                injections.append(
-                    recfunctions.append_fields(inj_rec, "kicid",
-                                               kicid + np.zeros(len(inj_rec),
-                                                                dtype=int)))
+                for inj in inj_rec:
+                    for k in inj.dtype.names:
+                        all_injections[k].append(inj[k])
+                    all_injections["directory"].append(d)
+                    all_injections["kicid"].append(kicid)
 
+            # Parse out the extra information in the header.
             extracols = ["kic_kepmag", "kic_teff", "kic_logg"]
-            extra = [kicid] + [f.attrs[k] for k in extracols]
-            extracols = ["kicid"] + extracols
+            extra = [f.attrs[k] for k in extracols]
+            extracols += ["has_injection", "directory"]
+            extra += [(len(inj_rec) > 0), d]
 
-            # Loop over the peaks and check if they're injections.
-            peaks = []
+            # Loop over the peaks and save the features.
+            peakid = 0
             for nm in f:
+                # Skip non-peak datasets.
                 if not nm.startswith("peak_"):
                     continue
+
+                # Extract the peak.
                 g = f[nm]
                 peak = dict(g.attrs)
 
+                # Include the extra columns.
+                for k, v in zip(extracols, extra):
+                    all_features[k].append(v)
+
+                # Include the binned light curve.
                 lc = g["bin_lc"][...]
+                to_skip = []
+                for i, row in enumerate(lc):
+                    k = "lc_{0}".format(i)
+                    to_skip.append(k)
+                    all_features[k].append(row["flux"])
+                    k = "lc_err_{0}".format(i)
+                    to_skip.append(k)
+                    all_features[k].append(row["flux_err"])
 
-                if dtype is None:
-                    dtype = [(str(c), float) for c in sorted(peak.keys())
-                             if not (c.startswith("is_") or
-                                     c.startswith("injected_"))]
-                    dtype = dtype + [("is_injection", bool), ("is_koi", bool)]
-                    colnames = [c for c, _ in dtype]
-                    dtype = zip(extracols, [int, float, float, float]) + dtype
-                    dtype += [("lc_{0}".format(i), float)
-                              for i in range(len(lc))]
-                    dtype += [("lc_err_{0}".format(i), float)
-                              for i in range(len(lc))]
-                    dtype = np.dtype(dtype)
-                if len(inj_rec):
-                    inj_features.append(tuple(extra
-                                              + [peak[c] for c in colnames])
-                                        + tuple(lc["flux"])
-                                        + tuple(lc["flux_err"]))
-                else:
-                    noinj_features.append(tuple(extra +
-                                                [peak[c] for c in colnames])
-                                          + tuple(lc["flux"])
-                                          + tuple(lc["flux_err"]))
+                # Choose the column names to loop over.
+                cols = set(peak.keys() + all_features.keys())
+                cols -= set(["kicid", "peakid"] + to_skip + extracols)
+                for k in cols:
+                    all_features[str(k)].append(peak.get(k, np.nan))
+                all_features["peakid"].append(peakid)
+                peakid += 1
+                all_features["kicid"].append(kicid)
 
-    # Save the features.
-    inj_features = np.array(inj_features, dtype=dtype)
-    noinj_features = np.array(noinj_features, dtype=dtype)
-    print(len(inj_features))
-    with h5py.File(os.path.join(args.results, "features.h5"), "w") as f:
-        f.create_dataset("inj_features", data=inj_features)
-        f.create_dataset("noinj_features", data=noinj_features)
+    # Make sure that NaNs become Falses when they should.
+    all_features["injected_rec"] = [v if np.isfinite(v) else False
+                                    for v in all_features["injected_rec"]]
+    all_features["koi_rec"] = [v if np.isfinite(v) else False
+                               for v in all_features["koi_rec"]]
 
-    dtype = injections[0].dtype
-    injections = np.array(np.concatenate(injections, axis=0), dtype=dtype)
-    with h5py.File(os.path.join(args.results, "injections.h5"), "w") as f:
-        f.create_dataset("injections", data=injections)
+    # Save the feature DataFrame.
+    features = pd.DataFrame(all_features)
+    features.to_hdf(os.path.join(args.results, "features.h5"), "features",
+                    mode="w")
 
-    assert 0
-
-    m = injections["rec"]
-    print(np.sum(m), len(injections))
-
-    samples = np.vstack((np.log(injections["period"]),
-                         np.log(injections["radius"] / 0.01))).T
-    img_all, b = np.histogramdd(samples, bins=(bins[0][-12:], bins[1][:40]))
-    img_yes, _ = np.histogramdd(samples[m], bins=b)
-    z = img_yes / img_all
-    z[~np.isfinite(z)] = 1.0
-    z = scipy.ndimage.filters.gaussian_filter(z, 1.)
-    x, y = b
-    c = pl.contour(x[:-1]+0.5*np.diff(x), y[:-1]+0.5*np.diff(y), z.T,
-                   12, colors="r", linewidths=1, alpha=0.6, vmin=0,
-                   vmax=1)
-    pl.clabel(c, fontsize=12, inline=1, fmt="%.2f")
-
-    # pl.plot(np.log(injections["period"][~m]),
-    #         np.log(injections["radius"][~m] / 0.01),
-    #         ".r")
-    # pl.plot(np.log(injections["period"][m]),
-    #         np.log(injections["radius"][m] / 0.01),
-    #         ".k")
-
-    x, y = bins
-    z = np.exp(lncompleteness[1:-1, 1:-1])
-    z = scipy.ndimage.filters.gaussian_filter(z, 1)
-    c = pl.contour(x[:-1]+0.5*np.diff(x), y[:-1]+0.5*np.diff(y), z.T,
-                   12, colors="k", linewidths=1, alpha=0.6, vmin=0,
-                   vmax=1)
-    pl.clabel(c, fontsize=12, inline=1, fmt="%.2f")
-
-    pl.gca().axhline(0.0, color="k", lw=2, alpha=0.3)
-    pl.gca().axvline(np.log(365.), color="k", lw=2, alpha=0.3)
-
-    pl.xlim(min(b[0]), max(b[0]))
-    pl.ylim(min(b[1]), max(b[1]) + 1)
-    pl.xlabel(r"$\ln P / \mathrm{days}$")
-    pl.ylabel(r"$\ln R / R_\oplus$")
-    pl.savefig(os.path.join(args.results, "completeness.png"))
+    # Save the injections DataFrame.
+    injs = pd.DataFrame(all_injections)
+    injs.to_hdf(os.path.join(args.results, "injections.h5"), "injections",
+                mode="w")
