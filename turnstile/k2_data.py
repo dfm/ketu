@@ -17,16 +17,18 @@ class K2Data(Pipeline):
     query_parameters = {
         "light_curve_file": (None, True),
         "basis_file": (None, True),
+        "nbasis": (150, False),
     }
 
     def get_result(self, query, parent_response):
         return dict(model_light_curves=[K2LightCurve(query["light_curve_file"],
-                                                     query["basis_file"])])
+                                                     query["basis_file"],
+                                                     nbasis=query["nbasis"])])
 
 
 class K2LightCurve(object):
 
-    def __init__(self, fn, basis_file):
+    def __init__(self, fn, basis_file, nbasis=150, sigma_clip=7.0, max_iter=7):
         data = fitsio.read(fn)
         aps = fitsio.read(fn, 2)
 
@@ -52,14 +54,43 @@ class K2LightCurve(object):
         # Estimate the uncertainties.
         self.ivar = 1.0 / np.median(np.diff(self.flux) ** 2)
         self.ferr = np.ones_like(self.flux) / np.sqrt(self.ivar)
-        self.scaled = self.flux * self.ivar
 
         # Load the prediction basis.
         with h5py.File(basis_file, "r") as f:
-            basis = f["basis"][...]
+            basis = f["basis"][:nbasis, :]
         self.basis = np.concatenate((basis[:, m], np.ones((1, m.sum()))))
+        self.update_matrices()
 
+        # Do a few rounds of sigma clipping.
+        m = None
+        i = 0
+        while i < max_iter and (m is None or m.sum()):
+            mu = self.predict()
+            std = np.sqrt(np.median((self.flux - mu) ** 2))
+            m = self.flux - mu > sigma_clip * std
+            self.flux = self.flux[~m]
+            self.time = self.time[~m]
+            self.ferr = self.ferr[~m]
+            self.basis = self.basis[:, ~m]
+            self.update_matrices()
+            i += 1
+            print(i, std, sum(m), len(self.flux))
+
+        # Force contiguity.
+        self.time = np.ascontiguousarray(self.time, dtype=np.float64)
+        self.flux = np.ascontiguousarray(self.flux, dtype=np.float64)
+
+        # Pre-compute the base likelihood.
         self.ll0 = self.lnlike()
+
+    def update_matrices(self):
+        n = self.basis.shape[0] + 1
+        self.ATA = np.empty((n, n), dtype=np.float64)
+        self.ATA[1:, 1:] = np.dot(self.basis, self.basis.T)
+        self.ATA[np.diag_indices_from(self.ATA)] += 1e-10
+
+        self.scaled = np.empty(n, dtype=np.float64)
+        self.scaled[1:] = np.dot(self.basis, self.flux)
 
     def lnlike(self, model=None):
         if model is None:
@@ -70,26 +101,27 @@ class K2LightCurve(object):
         if m[0] != 0.0 or m[-1] != 0.0 or np.all(m == 0.0):
             return 0.0, 0.0, 0.0
 
-        # Build the design matrix and do the linear fit.
-        A = np.concatenate(([m], self.basis))
-        ATA = np.dot(A, A.T * self.ivar)
-        ATA[np.diag_indices_from(ATA)] += 1e-10
+        # Update the matrices.
+        v = np.dot(self.basis, m)
+        self.ATA[0, 1:] = v
+        self.ATA[1:, 0] = v
+        self.ATA[0, 0] = np.dot(m, m)
+        self.scaled[0] = np.dot(m, self.flux)
 
         # This is the depth inverse variance.
-        s = 1.0 / np.linalg.inv(ATA)[0, 0]
+        s = self.ivar / np.linalg.inv(self.ATA)[0, 0]
 
         # And the linear weights (depth is the first).
-        factor = cho_factor(ATA, overwrite_a=True)
-        w = cho_solve(factor, np.dot(A, self.scaled), overwrite_b=True)
+        factor = cho_factor(self.ATA, overwrite_a=False)
+        w = cho_solve(factor, self.scaled, overwrite_b=False)
 
         # Compute the lnlikelihood.
-        ll = -0.5 * np.sum((self.flux - np.dot(w, A))**2) * self.ivar
+        mu = np.dot(w[1:], self.basis) + w[0] * m
+        ll = -0.5 * np.sum((self.flux - mu)**2) * self.ivar
         return ll - self.ll0, w[0], s
 
     def predict(self, y=None):
         if y is None:
             y = self.flux
-        ATA = np.dot(self.basis, self.basis.T)
-        ATA[np.diag_indices_from(ATA)] += 1e-10
-        w = np.linalg.solve(ATA, np.dot(self.basis, y))
+        w = np.linalg.solve(self.ATA[1:, 1:], np.dot(self.basis, y))
         return np.dot(w, self.basis)

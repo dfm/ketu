@@ -92,6 +92,7 @@ if __name__ == "__main__":
 
     query = dict(
         basis_file=os.path.abspath(args.basis_file),
+        time_spacing=0.02,
         durations=[0.05, 0.1, 0.2],
         min_period=args.min_period,
         max_period=args.max_period,
