@@ -52,6 +52,7 @@ class K2LightCurve(object):
         # Estimate the uncertainties.
         self.ivar = 1.0 / np.median(np.diff(self.flux) ** 2)
         self.ferr = np.ones_like(self.flux) / np.sqrt(self.ivar)
+        self.scaled = self.flux * self.ivar
 
         # Load the prediction basis.
         with h5py.File(basis_file, "r") as f:
@@ -79,8 +80,7 @@ class K2LightCurve(object):
 
         # And the linear weights (depth is the first).
         factor = cho_factor(ATA, overwrite_a=True)
-        y = self.ivar * (self.flux - model)
-        w = cho_solve(factor, np.dot(A, y), overwrite_b=True)
+        w = cho_solve(factor, np.dot(A, self.scaled), overwrite_b=True)
 
         # Compute the lnlikelihood.
         ll = -0.5 * np.sum((self.flux - np.dot(w, A))**2) * self.ivar
