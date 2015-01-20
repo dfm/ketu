@@ -4,6 +4,8 @@ from __future__ import division, print_function, unicode_literals
 
 __all__ = ["K2Data"]
 
+import os
+import kplr
 import h5py
 import fitsio
 import numpy as np
@@ -16,19 +18,23 @@ class K2Data(Pipeline):
 
     query_parameters = {
         "light_curve_file": (None, True),
-        "basis_file": (None, True),
-        "nbasis": (150, False),
+        "initial_time": (1975., False)
     }
 
     def get_result(self, query, parent_response):
-        return dict(model_light_curves=[K2LightCurve(query["light_curve_file"],
-                                                     query["basis_file"],
-                                                     nbasis=query["nbasis"])])
+        client = kplr.API()
+        fn = query["light_curve_file"]
+        epicid = os.path.split(fn)[-1].split("-")[0][4:]
+        return dict(
+            epic=client.k2_star(int(epicid)),
+            target_light_curves=[K2LightCurve(fn,
+                                              time0=query["initial_time"])],
+        )
 
 
 class K2LightCurve(object):
 
-    def __init__(self, fn, basis_file, nbasis=150, sigma_clip=7.0, max_iter=7):
+    def __init__(self, fn, time0=1975.):
         data = fitsio.read(fn)
         aps = fitsio.read(fn, 2)
 
@@ -38,15 +44,16 @@ class K2LightCurve(object):
         i = np.argmin(var)
 
         # Load the data.
-        self.time = data["time"]
+        self.time = data["time"] - time0
         self.flux = data["flux"][:, i]
         q = data["quality"]
 
         # Drop the bad data.
-        m = np.isfinite(self.time) * np.isfinite(self.flux) * (q == 0)
-        self.time = np.ascontiguousarray(self.time[m], dtype=np.float64)
-        self.flux = np.ascontiguousarray(self.flux[m], dtype=np.float64)
+        self.m = np.isfinite(self.time) * np.isfinite(self.flux) * (q == 0)
+        self.time = np.ascontiguousarray(self.time[self.m], dtype=np.float64)
+        self.flux = np.ascontiguousarray(self.flux[self.m], dtype=np.float64)
 
+    def prepare(self, basis_file, nbasis=150, sigma_clip=7.0, max_iter=7):
         # Normalize the data.
         self.flux = self.flux / np.median(self.flux) - 1.0
         self.flux *= 1e3  # Convert to ppt.
@@ -58,7 +65,8 @@ class K2LightCurve(object):
         # Load the prediction basis.
         with h5py.File(basis_file, "r") as f:
             basis = f["basis"][:nbasis, :]
-        self.basis = np.concatenate((basis[:, m], np.ones((1, m.sum()))))
+        self.basis = np.concatenate((basis[:, self.m],
+                                     np.ones((1, self.m.sum()))))
         self.update_matrices()
 
         # Do a few rounds of sigma clipping.

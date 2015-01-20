@@ -13,7 +13,7 @@ if not __TURNSTILE_SETUP__:
                "OneDSearch", "TwoDSearch", "PeakDetect", "FeatureExtract",
                "Validate",
                "characterization",
-               "K2Data", ]
+               "K2Data", "K2Inject", "K2Likelihood"]
 
     from .pipeline import Pipeline
     from .download import Download, PreparedDownload
@@ -31,3 +31,5 @@ if not __TURNSTILE_SETUP__:
     from . import characterization
 
     from .k2_data import K2Data
+    from .k2_inject import K2Inject
+    from .k2_likelihood import K2Likelihood
