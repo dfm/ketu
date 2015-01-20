@@ -38,6 +38,8 @@ if __name__ == "__main__":
     # creation.
     all_features = defaultdict(lambda: [np.nan]*len(all_features["kicid"]))
     all_features["kicid"] = []
+    all_injections = defaultdict(lambda: [np.nan]*len(all_injections["kicid"]))
+    all_injections["kicid"] = []
 
     # Loop over the matching directories.
     for ind, d in enumerate(glob.iglob(args.pattern)):
@@ -54,9 +56,19 @@ if __name__ == "__main__":
             kicid = data["kicid"]
 
         with h5py.File(feat_fn, "r") as f:
+            # Get any injection information.
+            inj_rec = f["inj_rec"][...]
+            if len(inj_rec):
+                for inj in inj_rec:
+                    for k in inj.dtype.names:
+                        all_injections[k].append(inj[k])
+                    all_injections["directory"].append(d)
+                    all_injections["kepmag"].append(f.attrs["kic_kepmag"])
+                    all_injections["kicid"].append(kicid)
+
             # Parse out the extra information in the header.
-            extracols = ["directory"]
-            extra = [d]
+            extracols = ["kic_kepmag", "directory"]
+            extra = [f.attrs["kic_kepmag"], d]
 
             # Loop over the peaks and save the features.
             peakid = 0
@@ -82,7 +94,16 @@ if __name__ == "__main__":
                 peakid += 1
                 all_features["kicid"].append(kicid)
 
+    # Make sure that NaNs become Falses when they should.
+    all_features["injected_rec"] = [v if np.isfinite(v) else False
+                                    for v in all_features["injected_rec"]]
+
     # Save the feature DataFrame.
     features = pd.DataFrame(all_features)
     features.to_hdf(os.path.join(args.results, "features.h5"), "features",
                     mode="w")
+
+    # Save the injections DataFrame.
+    injs = pd.DataFrame(all_injections)
+    injs.to_hdf(os.path.join(args.results, "injections.h5"), "injections",
+                mode="w")
