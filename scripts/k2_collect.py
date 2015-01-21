@@ -67,8 +67,8 @@ if __name__ == "__main__":
                     all_injections["kicid"].append(kicid)
 
             # Parse out the extra information in the header.
-            extracols = ["kic_kepmag", "directory"]
-            extra = [f.attrs["kic_kepmag"], d]
+            extracols = ["kic_kepmag", "directory", "has_injection"]
+            extra = [f.attrs["kic_kepmag"], d, len(inj_rec) > 0]
 
             # Loop over the peaks and save the features.
             peakid = 0
