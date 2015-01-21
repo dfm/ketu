@@ -156,10 +156,17 @@ class FeatureExtract(Pipeline):
                            kic_teff=kic.huber.Teff,
                            kic_logg=kic.huber["log(g)"])
         else:
-            results = dict(results,
-                           kic_kepmag=0.0,
-                           kic_teff=0.0,
-                           kic_logg=0.0)
+            try:
+                epic = parent_response.epic
+                results = dict(results,
+                               kic_kepmag=epic.kp,
+                               kic_teff=0.0,
+                               kic_logg=0.0)
+            except AttributeError:
+                results = dict(results,
+                               kic_kepmag=0.0,
+                               kic_teff=0.0,
+                               kic_logg=0.0)
         return results
 
     def save_to_cache(self, fn, response):
