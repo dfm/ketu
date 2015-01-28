@@ -113,6 +113,8 @@ if __name__ == "__main__":
         max_period=args.max_period,
         number_of_peaks=5,
         validation_path=os.path.join(args.base_dir),
+        nbasis=150,
+        alpha=152*np.log(3500.)-np.log(2*np.pi),
     )
 
     # Initialize the pool.

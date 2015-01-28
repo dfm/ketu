@@ -26,8 +26,6 @@ exts = [
               **kwargs),
     Extension("turnstile._grid_search", sources=["turnstile/_grid_search.pyx"],
               **kwargs),
-    Extension("turnstile._gp", sources=["turnstile/_gp.pyx"],
-              **kwargs),
 ]
 
 # Hackishly inject a constant into builtins to enable importing of the
