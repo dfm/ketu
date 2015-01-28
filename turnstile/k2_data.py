@@ -35,8 +35,10 @@ class K2Data(Pipeline):
 class K2LightCurve(object):
 
     def __init__(self, fn, time0=1975.):
-        data = fitsio.read(fn)
+        data, hdr = fitsio.read(fn, header=True)
         aps = fitsio.read(fn, 2)
+
+        self.texp = (hdr["INT_TIME"] * hdr["NUM_FRM"]) / 86400.0
 
         # Choose the photometry with the smallest variance.
         var = aps["cdpp6"]
@@ -96,6 +98,7 @@ class K2LightCurve(object):
         self.ATA = np.empty((n, n), dtype=np.float64)
         self.ATA[1:, 1:] = np.dot(self.basis, self.basis.T)
         self.ATA[np.diag_indices_from(self.ATA)] += 1e-10
+        self._factor = cho_factor(self.ATA[1:, 1:])
 
         self.scaled = np.empty(n, dtype=np.float64)
         self.scaled[1:] = np.dot(self.basis, self.flux)
@@ -131,5 +134,5 @@ class K2LightCurve(object):
     def predict(self, y=None):
         if y is None:
             y = self.flux
-        w = np.linalg.solve(self.ATA[1:, 1:], np.dot(self.basis, y))
+        w = cho_solve(self._factor, np.dot(self.basis, y), overwrite_b=True)
         return np.dot(w, self.basis)
