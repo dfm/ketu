@@ -55,7 +55,7 @@ class K2LightCurve(object):
         self.time = np.ascontiguousarray(self.time[self.m], dtype=np.float64)
         self.flux = np.ascontiguousarray(self.flux[self.m], dtype=np.float64)
 
-    def prepare(self, basis_file, nbasis=150, sigma_clip=7.0, max_iter=7):
+    def prepare(self, basis_file, nbasis=150, sigma_clip=7.0, max_iter=10):
         # Normalize the data.
         self.flux = self.flux / np.median(self.flux) - 1.0
         self.flux *= 1e3  # Convert to ppt.
@@ -69,26 +69,35 @@ class K2LightCurve(object):
             basis = f["basis"][:nbasis, :]
         self.basis = np.concatenate((basis[:, self.m],
                                      np.ones((1, self.m.sum()))))
-        self.update_matrices()
 
         # Do a few rounds of sigma clipping.
-        m = None
-        i = 0
-        while i < max_iter and (m is None or m.sum()):
-            mu = self.predict()
+        b0, f0 = np.array(self.basis), np.array(self.flux)
+        m1 = np.ones_like(self.flux, dtype=bool)
+        m2 = np.zeros_like(self.flux, dtype=bool)
+        count = m1.sum()
+        for i in range(max_iter):
+            # Predict using the "good" points.
+            b = self.basis[:, m1]
+            w = np.linalg.solve(np.dot(b, b.T), np.dot(b, self.flux[m1]))
+            mu = np.dot(w, self.basis)
+
+            # Mask the bad points.
             std = np.sqrt(np.median((self.flux - mu) ** 2))
-            m = self.flux - mu > sigma_clip * std
-            self.flux = self.flux[~m]
-            self.time = self.time[~m]
-            self.ferr = self.ferr[~m]
-            self.basis = self.basis[:, ~m]
-            self.update_matrices()
-            i += 1
-            print(i, std, sum(m), len(self.flux))
+            m1 = np.abs(self.flux - mu) < sigma_clip * std
+            m2 = self.flux - mu > sigma_clip * std
+
+            print(m1.sum(), count)
+            if m1.sum() == count:
+                break
+            count = m1.sum()
 
         # Force contiguity.
-        self.time = np.ascontiguousarray(self.time, dtype=np.float64)
-        self.flux = np.ascontiguousarray(self.flux, dtype=np.float64)
+        m2 = ~m2
+        self.time = np.ascontiguousarray(self.time[m2], dtype=np.float64)
+        self.flux = np.ascontiguousarray(self.flux[m2], dtype=np.float64)
+        self.ferr = np.ascontiguousarray(self.ferr[m2], dtype=np.float64)
+        self.basis = np.ascontiguousarray(self.basis[:, m2], dtype=np.float64)
+        self.update_matrices()
 
         # Pre-compute the base likelihood.
         self.ll0 = self.lnlike()
