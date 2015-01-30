@@ -4,15 +4,12 @@ from __future__ import division, print_function
 
 __all__ = ["Validate"]
 
-from matplotlib import rcParams
-rcParams["font.size"] = 10
-rcParams["text.usetex"] = False
-
 import os
 import json
 import numpy as np
 import cPickle as pickle
 import matplotlib.pyplot as pl
+from matplotlib import rcParams
 
 from .pipeline import Pipeline
 
@@ -60,6 +57,9 @@ class Validate(Pipeline):
             os.makedirs(bp)
         except os.error:
             pass
+
+        rcParams["font.size"] = 10
+        rcParams["text.usetex"] = False
 
         peaks = parent_response.features
 
@@ -119,6 +119,7 @@ class Validate(Pipeline):
         ax.set_ylabel("epoch [days]")
         ax.set_title("period vs. offset")
         fig.savefig(os.path.join(bp, "period-phase.png"))
+        pl.close(fig)
 
         # Loop over the peaks and plot the light curve for each one.
         fig = pl.figure(figsize=(10, 5))
@@ -158,6 +159,7 @@ class Validate(Pipeline):
             ax.set_ylabel("relative flux [ppt]")
 
             fig.savefig(os.path.join(bp, "peak-{0:04d}.png".format(i)))
+        pl.close(fig)
 
         # Format the HTML report.
         inj_rec = parent_response["inj_rec"]
