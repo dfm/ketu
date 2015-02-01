@@ -64,7 +64,7 @@ def search(bp):
 
 
 def generate_system(K, min_period=3., max_period=80.,
-                    min_ror=0.03, max_ror=0.2):
+                    min_ror=0.02, max_ror=0.2):
     labels = ["period", "t0", "radius", "b", "e", "pomega", "q1", "q2"]
 
     periods = np.exp(np.random.uniform(np.log(min_period), np.log(max_period),
@@ -89,11 +89,11 @@ if __name__ == "__main__":
     parser.add_argument("file_glob", help="pattern for the LC files")
     parser.add_argument("basis_file", help="the archive of PCA comps")
     parser.add_argument("base_dir", help="the directory for output")
-    parser.add_argument("--ninj", type=float, default=9,
+    parser.add_argument("--ninj", type=float, default=0,
                         help="number of injections")
     parser.add_argument("--min-period", type=float, default=3.0,
                         help="minimum period")
-    parser.add_argument("--max-period", type=float, default=80.0,
+    parser.add_argument("--max-period", type=float, default=70.0,
                         help="maximum period")
     parser.add_argument("-p", "--profile-dir", default=None,
                         help="the IPython profile dir")
@@ -144,7 +144,11 @@ if __name__ == "__main__":
                 query["validation_path"] = os.path.join(outdir, "results")
                 if i:
                     k = np.argmax(np.random.multinomial(1, multi)) + 1
-                    q = dict(query, **(generate_system(k)))
+                    q = dict(query, **(generate_system(
+                        k,
+                        min_period=args.min_period,
+                        max_period=args.max_period,
+                    )))
                 else:
                     q = dict(query)
 
@@ -154,7 +158,7 @@ if __name__ == "__main__":
                 if i:
                     pipe = turnstile.K2Inject(pipe, cache=False)
                 pipe = turnstile.K2Likelihood(pipe, cache=False)
-                pipe = turnstile.OneDSearch(pipe)
+                pipe = turnstile.OneDSearch(pipe, cache=False)
                 pipe = turnstile.TwoDSearch(pipe, cache=False)
                 pipe = turnstile.PeakDetect(pipe, cache=False)
                 pipe = turnstile.FeatureExtract(pipe, cache=False)
