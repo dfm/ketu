@@ -47,7 +47,7 @@ if __name__ == "__main__":
         feat_fn = os.path.join(d, "results", "features.h5")
         q_fn = os.path.join(d, "query.json")
         if not os.path.exists(feat_fn) or not os.path.exists(q_fn):
-            print("Skipping {0}".format(d))
+            # print("Skipping {0}".format(d))
             continue
 
         # Get the KIC ID.
@@ -85,9 +85,17 @@ if __name__ == "__main__":
                 for k, v in zip(extracols, extra):
                     all_features[k].append(v)
 
+                # Include the binned light curve.
+                lc = g["bin_lc"][...]
+                to_skip = []
+                for i, row in enumerate(lc):
+                    k = "lc_{0}".format(i)
+                    to_skip.append(k)
+                    all_features[k].append(row["flux"])
+
                 # Choose the column names to loop over.
                 cols = set(peak.keys() + all_features.keys())
-                cols -= set(["kicid", "peakid"] + extracols)
+                cols -= set(["kicid", "peakid"] + to_skip + extracols)
                 for k in cols:
                     all_features[str(k)].append(peak.get(k, np.nan))
                 all_features["peakid"].append(peakid)
