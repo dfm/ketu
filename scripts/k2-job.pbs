@@ -1,6 +1,6 @@
 #!/bin/bash
-#PBS -l nodes=18:ppn=20
-#PBS -l walltime=18:00:00
+#PBS -l nodes=5:ppn=20
+#PBS -l walltime=24:00:00
 #PBS -l mem=350GB
 #PBS -N k2
 #PBS -m ae
@@ -9,15 +9,20 @@
  
 module purge
 export PATH="$HOME/anaconda/bin:$PATH"
+module load mvapich2/intel/2.0rc1
 
 # Locations.
 export SRCDIR=$HOME/projects/k2-turnstile
-export RUNDIR=$WORK/k2/results
+export RUNDIR=$WORK/k2/results_3
 export PROFILEDIR=$RUNDIR/profile
 mkdir -p $RUNDIR
 cd $RUNDIR
 
-# Set up and start the IPython cluster.
+# Note which version of MPI we're using.
+echo `which mpiexec` > mpiexec.log
+
+# Set up and start the IPython cluster. Note: this *is* started using MPI!!
+# and it should use the mpiexec that I enabled above.
 cp -r $HOME/.ipython/profile_mpi $PROFILEDIR
 ipcluster start -n $PBS_NP --profile-dir=$PROFILEDIR &> ipcluster.log &
 
@@ -32,7 +37,7 @@ done
 
 if (( success )); then
     # Run the analysis.
-    python $SRCDIR/scripts/k2_search.py "$WORK/k2/data/c1/*/*/*.fits" $WORK/k2/data/c1-basis.h5 $RUNDIR --profile-dir $PROFILEDIR &> output.log
+    python $SRCDIR/scripts/k2_search.py "$WORK/k2/data/lightcurves/c1/*/*/*.fits" $WORK/k2/data/lightcurves/c1-basis.h5 $RUNDIR --profile-dir $PROFILEDIR &> output.log
 else
     echo "Server never started" &> output.log
 fi

@@ -64,7 +64,7 @@ def search(bp):
 
 
 def generate_system(K, min_period=3., max_period=80.,
-                    min_ror=0.03, max_ror=0.2):
+                    min_ror=0.02, max_ror=0.2):
     labels = ["period", "t0", "radius", "b", "e", "pomega", "q1", "q2"]
 
     periods = np.exp(np.random.uniform(np.log(min_period), np.log(max_period),
@@ -89,11 +89,11 @@ if __name__ == "__main__":
     parser.add_argument("file_glob", help="pattern for the LC files")
     parser.add_argument("basis_file", help="the archive of PCA comps")
     parser.add_argument("base_dir", help="the directory for output")
-    parser.add_argument("--ninj", type=float, default=9,
+    parser.add_argument("--ninj", type=float, default=0,
                         help="number of injections")
     parser.add_argument("--min-period", type=float, default=3.0,
                         help="minimum period")
-    parser.add_argument("--max-period", type=float, default=80.0,
+    parser.add_argument("--max-period", type=float, default=70.0,
                         help="maximum period")
     parser.add_argument("-p", "--profile-dir", default=None,
                         help="the IPython profile dir")
@@ -114,7 +114,6 @@ if __name__ == "__main__":
         number_of_peaks=5,
         validation_path=os.path.join(args.base_dir),
         nbasis=150,
-        alpha=152*np.log(3500.)-np.log(2*np.pi),
     )
 
     # Initialize the pool.
@@ -127,63 +126,70 @@ if __name__ == "__main__":
     multi /= np.sum(multi)
 
     # Loop over the files.
-    for fn in glob.iglob(args.file_glob):
-        for i in range(args.ninj + 1):
-            epicid = os.path.split(fn)[-1].split("-")[0][4:]
-            outdir = os.path.abspath(os.path.join(args.base_dir, epicid,
-                                                  "{0:04d}".format(i)))
-            if os.path.exists(os.path.join(outdir, "results", "features.h5")):
-                print("skipping {0}/{1:04d}".format(epicid, i))
-                continue
+    fns = glob.glob(args.file_glob)
+    bs = len(fns)
+    for batch in range(0, len(fns), bs):
+        for fn in fns[batch:batch+bs]:
+            for i in range(args.ninj + 1):
+                epicid = os.path.split(fn)[-1].split("-")[0][4:]
+                outdir = os.path.abspath(os.path.join(args.base_dir, epicid,
+                                                      "{0:04d}".format(i)))
+                if os.path.exists(os.path.join(outdir, "results", "features.h5")):
+                    print("skipping {0}/{1:04d}".format(epicid, i))
+                    continue
 
-            # Update the query.
-            query["kicid"] = "EPIC {0}".format(epicid)
-            query["light_curve_file"] = os.path.abspath(fn)
-            query["validation_path"] = os.path.join(outdir, "results")
-            if i:
-                k = np.argmax(np.random.multinomial(1, multi)) + 1
-                q = dict(query, **(generate_system(k)))
-            else:
-                q = dict(query)
-
-            # Build the pipeline first.
-            pipe = turnstile.K2Data(cache=False,
-                                    basepath=os.path.join(outdir, "cache"))
-            if i:
-                pipe = turnstile.K2Inject(pipe, cache=False)
-            pipe = turnstile.K2Likelihood(pipe, cache=False)
-            pipe = turnstile.OneDSearch(pipe)
-            pipe = turnstile.TwoDSearch(pipe, cache=False)
-            pipe = turnstile.PeakDetect(pipe, cache=False)
-            pipe = turnstile.FeatureExtract(pipe, cache=False)
-            pipe = turnstile.Validate(pipe, cache=False)
-
-            # Save the files.
-            try:
-                os.makedirs(outdir)
-            except os.error:
-                pass
-            with open(os.path.join(outdir, "pipeline.pkl"), "w") as f:
-                cPickle.dump((q, pipe), f, -1)
-            with open(os.path.join(outdir, "query.json"), "w") as f:
-                json.dump(q, f, sort_keys=True, indent=4)
-
-            # Submit the job.
-            jobs.append((outdir, pool.apply(search, outdir)))
-
-    # Monitor the jobs and check for completion and errors.
-    retrieved = [False] * len(jobs)
-    while not all(retrieved):
-        for i, (fn, j) in enumerate(jobs):
-            if j.ready() and not retrieved[i]:
-                try:
-                    j.get()
-                except Exception as e:
-                    with open(os.path.join(fn, "error.log"), "a") as f:
-                        f.write("Uncaught error:\n\n")
-                        f.write(traceback.format_exc())
+                # Update the query.
+                query["kicid"] = "EPIC {0}".format(epicid)
+                query["light_curve_file"] = os.path.abspath(fn)
+                query["validation_path"] = os.path.join(outdir, "results")
+                if i:
+                    k = np.argmax(np.random.multinomial(1, multi)) + 1
+                    q = dict(query, **(generate_system(
+                        k,
+                        min_period=args.min_period,
+                        max_period=args.max_period,
+                    )))
                 else:
-                    with open(os.path.join(fn, "success.log"), "w") as f:
-                        f.write("Finished at: {0}\n".format(time.time()))
-                retrieved[i] = True
-        time.sleep(1)
+                    q = dict(query)
+
+                # Build the pipeline first.
+                pipe = turnstile.K2Data(cache=False,
+                                        basepath=os.path.join(outdir, "cache"))
+                if i:
+                    pipe = turnstile.K2Inject(pipe, cache=False)
+                pipe = turnstile.K2Likelihood(pipe, cache=False)
+                pipe = turnstile.OneDSearch(pipe, cache=False)
+                pipe = turnstile.TwoDSearch(pipe, cache=False)
+                pipe = turnstile.PeakDetect(pipe, cache=False)
+                pipe = turnstile.FeatureExtract(pipe, cache=False)
+                pipe = turnstile.Validate(pipe, cache=False)
+
+                # Save the files.
+                try:
+                    os.makedirs(outdir)
+                except os.error:
+                    pass
+                with open(os.path.join(outdir, "pipeline.pkl"), "w") as f:
+                    cPickle.dump((q, pipe), f, -1)
+                with open(os.path.join(outdir, "query.json"), "w") as f:
+                    json.dump(q, f, sort_keys=True, indent=4)
+
+                # Submit the job.
+                jobs.append((outdir, pool.apply(search, outdir)))
+
+        # Monitor the jobs and check for completion and errors.
+        retrieved = [False] * len(jobs)
+        while not all(retrieved):
+            for i, (fn, j) in enumerate(jobs):
+                if j.ready() and not retrieved[i]:
+                    try:
+                        j.get()
+                    except Exception as e:
+                        with open(os.path.join(fn, "error.log"), "a") as f:
+                            f.write("Uncaught error:\n\n")
+                            f.write(traceback.format_exc())
+                    else:
+                        with open(os.path.join(fn, "success.log"), "w") as f:
+                            f.write("Finished at: {0}\n".format(time.time()))
+                    retrieved[i] = True
+            time.sleep(1)
