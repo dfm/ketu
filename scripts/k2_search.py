@@ -89,7 +89,7 @@ if __name__ == "__main__":
     parser.add_argument("file_glob", help="pattern for the LC files")
     parser.add_argument("basis_file", help="the archive of PCA comps")
     parser.add_argument("base_dir", help="the directory for output")
-    parser.add_argument("--ninj", type=float, default=0,
+    parser.add_argument("--ninj", type=float, default=8,
                         help="number of injections")
     parser.add_argument("--min-period", type=float, default=3.0,
                         help="minimum period")
