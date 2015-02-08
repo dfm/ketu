@@ -43,6 +43,9 @@ if __name__ == "__main__":
 
     # Loop over the matching directories.
     for ind, d in enumerate(glob.iglob(args.pattern)):
+        # if ind > 500:
+        #     break
+
         # Skip if any of the required files don't exist.
         feat_fn = os.path.join(d, "results", "features.h5")
         q_fn = os.path.join(d, "query.json")
@@ -92,6 +95,33 @@ if __name__ == "__main__":
                     k = "lc_{0}".format(i)
                     to_skip.append(k)
                     all_features[k].append(row["flux"])
+
+                # Include stats on the corrected light curve.
+                lc = g["corr_lc"][...]
+                fl = lc["flux"]
+                mean = np.mean(fl)
+                median = np.median(fl)
+                var = np.var(fl)
+                rvar = np.median((fl - median) ** 2)
+                mn, mx = np.min(fl), np.max(fl)
+                all_features["mean"].append(mean)
+                all_features["median"].append(median)
+                all_features["var"].append(var)
+                all_features["rvar"].append(rvar)
+                all_features["min"].append(mn)
+                all_features["max"].append(mx)
+                to_skip += ["mean", "median", "var", "rvar", "min", "max"]
+
+                # And binned stats.
+                be = np.linspace(-1.5, 1.5, 20)
+                inds = np.digitize(lc["time"], be) - 1
+                meds = np.array([np.median(fl[inds == k])
+                                 for k in range(len(be)-1)
+                                 if np.any(inds == k)])
+                all_features["bvar"].append(np.var(meds))
+                mmeds = np.median(meds)
+                all_features["rbvar"].append(np.median((meds-mmeds)**2))
+                to_skip += ["bvar", "rbvar"]
 
                 # Choose the column names to loop over.
                 cols = set(peak.keys() + all_features.keys())

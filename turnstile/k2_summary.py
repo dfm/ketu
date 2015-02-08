@@ -29,9 +29,9 @@ class K2Summary(Pipeline):
 
         tpf = fitsio.read(query["tpf_file"])
         lc_data = fitsio.read(query["light_curve_file"])
-        x, y = lc_data["x"], lc_data["y"]
-        i = np.arange(len(x))[np.isfinite(x) & np.isfinite(y)][-1]
-        xi, yi = x[i], y[i]
+        x = np.all(lc_data["flux"], axis=1)
+        i = np.arange(len(x))[np.isfinite(x)][-1]
+        # xi, yi = x[i], y[i]
 
         # Get the light curve object.
         lc = parent_response.model_light_curves[0]
@@ -164,7 +164,6 @@ class K2Summary(Pipeline):
                               2 * inner_h + vspace_b + vspace_t])
                 img = tpf["FLUX"][i].T
                 ax.imshow(-img, cmap="gray", interpolation="nearest")
-                ax.plot(x[i], y[i], "or")
                 ax.annotate("frame", **label_dict)
                 ax.set_xlim(-0.5, img.shape[1] - 0.5)
                 ax.set_ylim(-0.5, img.shape[0] - 0.5)
@@ -178,7 +177,6 @@ class K2Summary(Pipeline):
                 m = np.isfinite(img) & (img > 0)
                 limg[m] = np.log(img[m])
                 ax.imshow(-limg, cmap="gray", interpolation="nearest")
-                ax.plot(x[i], y[i], "or")
                 ax.annotate("log(frame)", **label_dict)
                 ax.set_xlim(-0.5, img.shape[1] - 0.5)
                 ax.set_ylim(-0.5, img.shape[0] - 0.5)

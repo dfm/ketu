@@ -8,6 +8,7 @@ import os
 import h5py
 import logging
 import numpy as np
+from scipy.ndimage.filters import gaussian_filter
 
 from .pipeline import Pipeline
 
@@ -33,6 +34,7 @@ class PeakDetect(Pipeline):
         number_of_peaks=(20, False),
         overlap_tol=(0.1, False),
         max_overlap=(0, False),
+        smooth=(None, False),
     )
 
     def get_result(self, query, parent_response):
@@ -63,6 +65,8 @@ class PeakDetect(Pipeline):
         w = np.linalg.solve(ATA, np.dot(A.T, phic_same[m]))
         z = -np.inf + np.zeros_like(phic_same)
         z[m] = phic_same[m] - np.dot(A, w)
+        if query["smooth"] is not None:
+            z[m] = gaussian_filter(z[m], query["smooth"])
 
         # Compute the RMS noise in this object.
         rms = np.sqrt(np.median(z[m] ** 2))

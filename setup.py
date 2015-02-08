@@ -6,10 +6,11 @@ import sys
 import numpy
 from Cython.Build import cythonize
 
-try:
-    from setuptools import setup, Extension
-except ImportError:
-    from distutils.core import setup, Extension
+# try:
+#     from setuptools import setup, Extension
+# except ImportError:
+#     from distutils.core import setup, Extension
+from distutils.core import setup, Extension
 
 # Publish the library to PyPI.
 if "publish" in sys.argv[1:]:
