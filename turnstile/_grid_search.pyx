@@ -139,9 +139,6 @@ def grid_search(double alpha,
     cdef double* depth_1d_data = <double*>depth_1d.data
     cdef double* depth_ivar_1d_data = <double*>depth_ivar_1d.data
 
-    # Keep track of the depth and s2n.
-    cdef double best_depth, best_s2n, tmp_s2n
-
     # Workspace for the transit indices.
     cdef int nimx = int(ceil((tmax - tmin) / periods.min()))
     cdef int* inds = <int*>malloc(nimx * sizeof(int))
@@ -150,8 +147,6 @@ def grid_search(double alpha,
     for i in range(nperiod):
         period = periods[i]
         t0 = 0.0
-        best_depth = 0.0
-        best_s2n = 0.0
 
         # Loop over every possible phase for the given period.
         while 1:
@@ -163,12 +158,7 @@ def grid_search(double alpha,
 
             # Loop over durations and decide if this should be accepted.
             for k in range(nduration):
-                tmp_s2n = depth_2d_tmp[k] * sqrt(depth_ivar_2d_tmp[k])
-                # if depth_2d_tmp[k] > 0.0 and :
-                if (depth_2d_tmp[k] > 0.0 and
-                        phic_same_tmp[k] > phic_variable_tmp[k] and
-                        tmp_s2n > best_s2n):
-                    best_s2n = tmp_s2n
+                if (depth_2d_tmp[k] > 0.0 and phic_same_tmp[k] > phic_variable_tmp[k]):
                     if phic_same_tmp[k] > phic_same[i, k]:
                         phic_same_2[i, k] = phic_same[i, k]
                         phic_same[i, k] = phic_same_tmp[k]

@@ -11,7 +11,7 @@ if not __TURNSTILE_SETUP__:
     __all__ = ["Pipeline", "Download", "PreparedDownload", "Inject",
                "Prepare", "Discontinuity", "Detrend", "GPLikelihood",
                "OneDSearch", "TwoDSearch", "PeakDetect", "FeatureExtract",
-               "Validate",
+               "Validate", "IterativeTwoDSearch",
                "characterization",
                "K2Data", "K2Inject", "K2Likelihood", "K2Summary"]
 
@@ -27,6 +27,7 @@ if not __TURNSTILE_SETUP__:
     from .peak_detect import PeakDetect
     from .feature_extract import FeatureExtract
     from .dv import Validate
+    from .iterative import IterativeTwoDSearch
 
     from . import characterization
 

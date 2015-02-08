@@ -50,6 +50,12 @@ def search(bp):
         with open(os.path.join(bp, "output.log"), "a") as f:
             f.write("Finished in {0} seconds\n".format(time.time() - strt))
 
+        # Save the output.
+        bp = q["results_path"]
+        pipe.save_to_cache(os.path.join(bp, "features.h5"), r)
+        pipe.parent.save_to_cache(os.path.join(bp, "peaks.h5"),
+                                  r.parent_response)
+
     except:
         with open(os.path.join(bp, "error.log"), "a") as f:
             f.write("Error during execution:\n\n")
@@ -89,9 +95,9 @@ if __name__ == "__main__":
     parser.add_argument("file_glob", help="pattern for the LC files")
     parser.add_argument("basis_file", help="the archive of PCA comps")
     parser.add_argument("base_dir", help="the directory for output")
-    parser.add_argument("--ninj", type=float, default=8,
+    parser.add_argument("--ninj", type=int, default=0,
                         help="number of injections")
-    parser.add_argument("--min-period", type=float, default=3.0,
+    parser.add_argument("--min-period", type=float, default=0.5,
                         help="minimum period")
     parser.add_argument("--max-period", type=float, default=70.0,
                         help="maximum period")
@@ -108,11 +114,10 @@ if __name__ == "__main__":
     query = dict(
         basis_file=os.path.abspath(args.basis_file),
         time_spacing=0.02,
+        dt=0.02,
         durations=[0.05, 0.1, 0.2],
         min_period=args.min_period,
         max_period=args.max_period,
-        number_of_peaks=5,
-        validation_path=os.path.join(args.base_dir),
         nbasis=150,
     )
 
@@ -127,7 +132,7 @@ if __name__ == "__main__":
 
     # Loop over the files.
     fns = glob.glob(args.file_glob)
-    bs = len(fns)
+    bs = 10  # len(fns)
     for batch in range(0, len(fns), bs):
         for fn in fns[batch:batch+bs]:
             for i in range(args.ninj + 1):
@@ -141,7 +146,7 @@ if __name__ == "__main__":
                 # Update the query.
                 query["kicid"] = "EPIC {0}".format(epicid)
                 query["light_curve_file"] = os.path.abspath(fn)
-                query["validation_path"] = os.path.join(outdir, "results")
+                query["results_path"] = os.path.join(outdir, "results")
                 if i:
                     k = np.argmax(np.random.multinomial(1, multi)) + 1
                     q = dict(query, **(generate_system(
@@ -159,14 +164,12 @@ if __name__ == "__main__":
                     pipe = turnstile.K2Inject(pipe, cache=False)
                 pipe = turnstile.K2Likelihood(pipe, cache=False)
                 pipe = turnstile.OneDSearch(pipe, cache=False)
-                pipe = turnstile.TwoDSearch(pipe, cache=False)
-                pipe = turnstile.PeakDetect(pipe, cache=False)
+                pipe = turnstile.IterativeTwoDSearch(pipe, cache=False)
                 pipe = turnstile.FeatureExtract(pipe, cache=False)
-                pipe = turnstile.Validate(pipe, cache=False)
 
                 # Save the files.
                 try:
-                    os.makedirs(outdir)
+                    os.makedirs(query["results_path"])
                 except os.error:
                     pass
                 with open(os.path.join(outdir, "pipeline.pkl"), "w") as f:
@@ -193,3 +196,5 @@ if __name__ == "__main__":
                             f.write("Finished at: {0}\n".format(time.time()))
                     retrieved[i] = True
             time.sleep(1)
+
+        assert 0
