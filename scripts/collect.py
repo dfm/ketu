@@ -95,7 +95,6 @@ if __name__ == "__main__":
                     all_features[k].append(row["flux"])
                     k = "lc_err_{0}".format(i)
                     to_skip.append(k)
-                    all_features[k].append(row["flux_err"])
 
                 # Choose the column names to loop over.
                 cols = set(peak.keys() + all_features.keys())
