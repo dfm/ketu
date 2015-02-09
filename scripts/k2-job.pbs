@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -l nodes=5:ppn=20
+#PBS -l nodes=2:ppn=20
 #PBS -l walltime=24:00:00
 #PBS -l mem=350GB
 #PBS -N k2
@@ -13,7 +13,7 @@ module load mvapich2/intel/2.0rc1
 
 # Locations.
 export SRCDIR=$HOME/projects/k2-turnstile
-export RUNDIR=$WORK/k2/results_3
+export RUNDIR=$WORK/k2/results
 export PROFILEDIR=$RUNDIR/profile
 mkdir -p $RUNDIR
 cd $RUNDIR

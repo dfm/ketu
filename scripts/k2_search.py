@@ -132,7 +132,7 @@ if __name__ == "__main__":
 
     # Loop over the files.
     fns = glob.glob(args.file_glob)
-    bs = 10  # len(fns)
+    bs = len(fns)
     for batch in range(0, len(fns), bs):
         for fn in fns[batch:batch+bs]:
             for i in range(args.ninj + 1):
