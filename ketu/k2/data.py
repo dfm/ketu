@@ -2,7 +2,7 @@
 
 from __future__ import division, print_function, unicode_literals
 
-__all__ = ["K2Data"]
+__all__ = ["Data"]
 
 import os
 import kplr
@@ -11,10 +11,10 @@ import fitsio
 import numpy as np
 from scipy.linalg import cho_solve, cho_factor
 
-from .pipeline import Pipeline
+from ..pipeline import Pipeline
 
 
-class K2Data(Pipeline):
+class Data(Pipeline):
 
     query_parameters = {
         "light_curve_file": (None, True),
@@ -71,7 +71,6 @@ class K2LightCurve(object):
                                      np.ones((1, self.m.sum()))))
 
         # Do a few rounds of sigma clipping.
-        b0, f0 = np.array(self.basis), np.array(self.flux)
         m1 = np.ones_like(self.flux, dtype=bool)
         m2 = np.zeros_like(self.flux, dtype=bool)
         count = m1.sum()

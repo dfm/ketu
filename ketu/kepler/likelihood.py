@@ -5,12 +5,20 @@ from __future__ import division, print_function, unicode_literals
 __all__ = ["GPLikelihood"]
 
 import numpy as np
-from emcee.autocorr import integrated_time
 
-import george
-from george.kernels import ExpSquaredKernel
+try:
+    from emcee.autocorr import integrated_time
+except ImportError:
+    integrated_time = None
 
-from .pipeline import Pipeline
+try:
+    import george
+except ImportError:
+    george = None
+else:
+    from george.kernels import ExpSquaredKernel
+
+from ..pipeline import Pipeline
 
 
 class GPLikelihood(Pipeline):
@@ -20,6 +28,11 @@ class GPLikelihood(Pipeline):
     )
 
     def __init__(self, *args, **kwargs):
+        if integrated_time is None:
+            raise ImportError("emcee is required for the GP model")
+        if george is None:
+            raise ImportError("george is required for the GP model")
+
         kwargs["cache"] = kwargs.pop("cache", False)
         super(GPLikelihood, self).__init__(*args, **kwargs)
 

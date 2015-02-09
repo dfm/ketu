@@ -2,12 +2,11 @@
 
 from __future__ import division, print_function, unicode_literals
 
-__all__ = ["Inject", "InjectedLightCurve"]
+__all__ = ["Inject"]
 
 import logging
 import transit
-import numpy as np
-from .pipeline import Pipeline
+from ..pipeline import Pipeline
 
 
 class Inject(Pipeline):
@@ -24,7 +23,8 @@ class Inject(Pipeline):
         # Parse the arguments.
         injections = query["injections"]
         if not len(injections):
-            return dict(target_datasets=parent_response.target_datasets)
+            return dict(
+                target_light_curves=parent_response.target_light_curves)
 
         # Build the system.
         q1 = query["q1"]
@@ -49,28 +49,8 @@ class Inject(Pipeline):
 
         # Inject the transit into each dataset.
         results = []
-        for _ in parent_response.target_datasets:
-            lc = InjectedLightCurve(_)
-            lc.flux[lc.m] *= s.light_curve(lc.time[lc.m])
+        for lc in parent_response.target_light_curves:
+            lc.flux *= s.light_curve(lc.time)
             results.append(lc)
 
-        return dict(target_datasets=results, injected_system=s)
-
-
-class InjectedLightCurve(object):
-
-    def __init__(self, lc):
-        for k, v in lc.params.iteritems():
-            setattr(self, k, v)
-
-        d = lc.read()
-        self.time = np.array(d["TIME"], dtype=np.float64)
-        self.flux = np.array(d["SAP_FLUX"], dtype=np.float64)
-        self.ferr = np.array(d["SAP_FLUX_ERR"], dtype=np.float64)
-        self.q = np.array(d["SAP_QUALITY"], dtype=int)
-        self.m = (np.isfinite(self.time) * np.isfinite(self.flux)
-                  * np.isfinite(self.ferr))
-
-    def read(self, **kwargs):
-        return dict(TIME=self.time, SAP_FLUX=self.flux, SAP_FLUX_ERR=self.ferr,
-                    SAP_QUALITY=self.q)
+        return dict(target_light_curves=results, injected_system=s)

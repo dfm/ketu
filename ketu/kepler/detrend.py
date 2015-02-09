@@ -4,7 +4,7 @@ from __future__ import division, print_function, unicode_literals
 
 __all__ = ["Detrend"]
 
-from .pipeline import Pipeline
+from ..pipeline import Pipeline
 
 
 class Detrend(Pipeline):

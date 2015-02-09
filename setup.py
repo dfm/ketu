@@ -6,11 +6,10 @@ import sys
 import numpy
 from Cython.Build import cythonize
 
-# try:
-#     from setuptools import setup, Extension
-# except ImportError:
-#     from distutils.core import setup, Extension
-from distutils.core import setup, Extension
+try:
+    from setuptools import setup, Extension
+except ImportError:
+    from distutils.core import setup, Extension
 
 # Publish the library to PyPI.
 if "publish" in sys.argv[1:]:
@@ -20,12 +19,12 @@ if "publish" in sys.argv[1:]:
 # Set up the extension.
 kwargs = dict(
     include_dirs=[numpy.get_include()],
-    extra_compile_args=["-Wno-unused-function", ]  # "-Wno-uninitialized"],
+    extra_compile_args=["-Wno-unused-function", ],
 )
 exts = [
-    Extension("turnstile._compute", sources=["turnstile/_compute.pyx"],
+    Extension("ketu._compute", sources=["ketu/_compute.pyx"],
               **kwargs),
-    Extension("turnstile._grid_search", sources=["turnstile/_grid_search.pyx"],
+    Extension("ketu._grid_search", sources=["ketu/_grid_search.pyx"],
               **kwargs),
 ]
 
@@ -35,19 +34,24 @@ if sys.version_info[0] < 3:
     import __builtin__ as builtins
 else:
     import builtins
-builtins.__TURNSTILE_SETUP__ = True
-import turnstile
+builtins.__KETU_SETUP__ = True
+import ketu
 
 # Execute the setup command.
 desc = open("README.rst").read()
 setup(
-    name="turnstile",
-    version=turnstile.__version__,
+    name="ketu",
+    version=ketu.__version__,
     author="Daniel Foreman-Mackey",
     author_email="danfm@nyu.edu",
-    packages=["turnstile", "turnstile.characterization"],
+    packages=[
+        "ketu",
+        "ketu.k2",
+        "ketu.kepler",
+        "ketu.characterization",
+    ],
     ext_modules=cythonize(exts),
-    url="http://github.com/dfm/turnstile",
+    url="http://github.com/dfm/ketu",
     license="MIT",
     description="MOAR Planets",
     long_description=desc,
@@ -60,5 +64,4 @@ setup(
         "Operating System :: OS Independent",
         "Programming Language :: Python",
     ],
-    test_suite="nose.collector",
 )

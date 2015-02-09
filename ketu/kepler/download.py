@@ -10,7 +10,7 @@ import kplr
 import shutil
 import cPickle as pickle
 
-from .pipeline import Pipeline
+from ..pipeline import Pipeline
 
 
 def prepare_download(query, fetch=True):

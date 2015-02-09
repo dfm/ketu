@@ -6,7 +6,7 @@ __all__ = ["Discontinuity"]
 
 import numpy as np
 
-from .pipeline import Pipeline
+from ..pipeline import Pipeline
 from .prepare import LightCurve
 
 

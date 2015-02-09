@@ -2,21 +2,23 @@
 
 from __future__ import division, print_function, unicode_literals
 
-__all__ = ["K2Summary"]
-
-from matplotlib import rcParams
-rcParams["text.usetex"] = True
+__all__ = ["Summary"]
 
 import fitsio
 import numpy as np
-import matplotlib.pyplot as pl
-from matplotlib.ticker import MaxNLocator
-from matplotlib.backends.backend_pdf import PdfPages
 
-from .pipeline import Pipeline
+try:
+    import matplotlib.pyplot as pl
+except ImportError:
+    pl = None
+else:
+    from matplotlib.ticker import MaxNLocator
+    from matplotlib.backends.backend_pdf import PdfPages
+
+from ..pipeline import Pipeline
 
 
-class K2Summary(Pipeline):
+class Summary(Pipeline):
 
     query_parameters = dict(
         summary_file=(None, True),
@@ -24,7 +26,15 @@ class K2Summary(Pipeline):
         signals=([], False),
     )
 
+    def __init__(self, *args, **kwargs):
+        if pl is None:
+            raise ImportError("matplotlib is required")
+        super(Summary, self).__init__(*args, **kwargs)
+
     def get_result(self, query, parent_response):
+        from matplotlib import rcParams
+        rcParams["text.usetex"] = True
+
         epic = parent_response.epic
 
         tpf = fitsio.read(query["tpf_file"])
@@ -81,7 +91,7 @@ class K2Summary(Pipeline):
                                   ntransit + 1,
                                   row["period"],
                                   row["depth"],
-                              ))
+                ))
 
                 # Plot the transit locations.
                 for mod, c in zip(query["signals"], colors):

@@ -2,12 +2,12 @@
 
 from __future__ import division, print_function, unicode_literals
 
-__all__ = ["K2Likelihood"]
+__all__ = ["Likelihood"]
 
-from .pipeline import Pipeline
+from ..pipeline import Pipeline
 
 
-class K2Likelihood(Pipeline):
+class Likelihood(Pipeline):
 
     query_parameters = {
         "basis_file": (None, True),

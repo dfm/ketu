@@ -8,8 +8,13 @@ import os
 import json
 import numpy as np
 import cPickle as pickle
-import matplotlib.pyplot as pl
-from matplotlib import rcParams
+
+try:
+    import matplotlib.pyplot as pl
+except ImportError:
+    pl = None
+else:
+    from matplotlib import rcParams
 
 from .pipeline import Pipeline
 
@@ -48,6 +53,9 @@ class Validate(Pipeline):
     )
 
     def __init__(self, *args, **kwargs):
+        if pl is None:
+            raise ImportError("matplotlib is required")
+
         kwargs["cache"] = kwargs.pop("cache", False)
         super(Validate, self).__init__(*args, **kwargs)
 

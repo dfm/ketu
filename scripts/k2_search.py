@@ -7,7 +7,6 @@ import os
 import sys
 import glob
 import json
-import turnstile
 import numpy as np
 from scipy.stats import beta
 
@@ -16,6 +15,8 @@ import time
 import cPickle
 import traceback
 from IPython.parallel import Client, require
+
+import ketu
 
 
 @require(os, sys, gc, cPickle, traceback, time)
@@ -139,7 +140,8 @@ if __name__ == "__main__":
                 epicid = os.path.split(fn)[-1].split("-")[0][4:]
                 outdir = os.path.abspath(os.path.join(args.base_dir, epicid,
                                                       "{0:04d}".format(i)))
-                if os.path.exists(os.path.join(outdir, "results", "features.h5")):
+                if os.path.exists(os.path.join(outdir, "results",
+                                               "features.h5")):
                     print("skipping {0}/{1:04d}".format(epicid, i))
                     continue
 
@@ -158,14 +160,14 @@ if __name__ == "__main__":
                     q = dict(query)
 
                 # Build the pipeline first.
-                pipe = turnstile.K2Data(cache=False,
-                                        basepath=os.path.join(outdir, "cache"))
+                pipe = ketu.k2.Data(cache=False,
+                                    basepath=os.path.join(outdir, "cache"))
                 if i:
-                    pipe = turnstile.K2Inject(pipe, cache=False)
-                pipe = turnstile.K2Likelihood(pipe, cache=False)
-                pipe = turnstile.OneDSearch(pipe, cache=False)
-                pipe = turnstile.IterativeTwoDSearch(pipe, cache=False)
-                pipe = turnstile.FeatureExtract(pipe, cache=False)
+                    pipe = ketu.k2.Inject(pipe, cache=False)
+                pipe = ketu.k2.Likelihood(pipe, cache=False)
+                pipe = ketu.OneDSearch(pipe, cache=False)
+                pipe = ketu.IterativeTwoDSearch(pipe, cache=False)
+                pipe = ketu.FeatureExtract(pipe, cache=False)
 
                 # Save the files.
                 try:
@@ -196,5 +198,3 @@ if __name__ == "__main__":
                             f.write("Finished at: {0}\n".format(time.time()))
                     retrieved[i] = True
             time.sleep(1)
-
-        assert 0

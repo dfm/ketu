@@ -7,7 +7,7 @@ __all__ = ["Prepare"]
 import numpy as np
 from itertools import izip
 
-from .pipeline import Pipeline
+from ..pipeline import Pipeline
 
 
 class Prepare(Pipeline):
