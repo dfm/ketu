@@ -1,0 +1,17 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import division, print_function
+from ketu.basis import build
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("lcs",
+                        help=("pattern for the LC files. For example: "
+                              "'lightcurves/c1/*/*/*.fits'"))
+    parser.add_argument("outfile",
+                        help="path where the basis should be saved")
+    args = parser.parse_args()
+    build(args.lcs, args.outfile)

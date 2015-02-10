@@ -5,12 +5,12 @@ from __future__ import division, print_function
 import glob
 from multiprocessing import Pool
 
-from ketu.photometry import process_file
+from ketu.photometry import run
 
 
 def _wrap(fn):
     try:
-        process_file(fn)
+        run(fn)
     except:
         print("failure: {0}".format(fn))
         import traceback
@@ -37,4 +37,4 @@ if __name__ == "__main__":
         pool = Pool()
         pool.map(_wrap, filenames)
     else:
-        map(process_file, filenames)
+        map(run, filenames)

@@ -52,7 +52,9 @@ setup(
     ],
     ext_modules=cythonize(exts),
     scripts=[
+        "scripts/ketu-download",
         "scripts/ketu-photometry",
+        "scripts/ketu-basis",
         "scripts/ketu-search",
         "scripts/ketu-collect",
     ],

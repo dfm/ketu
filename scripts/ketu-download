@@ -1,0 +1,28 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import division, print_function
+import os
+from subprocess import check_call
+
+CMD = ("wget -q -nH --cut-dirs=2 -r -l0 -c -N -np -R 'index*' -erobots=off "
+       "-P {0} http://archive.stsci.edu/missions/k2/target_pixel_files/c{1}/")
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("campaign", type=int,
+                        help="the Campaign to download")
+    parser.add_argument("basepath",
+                        help="the basepath for the output")
+    args = parser.parse_args()
+
+    try:
+        os.makedirs(args.basepath)
+    except os.error:
+        pass
+    cmd = CMD.format(args.basepath, args.campaign)
+    print("Running:")
+    print(cmd)
+    check_call(cmd, shell=True)
