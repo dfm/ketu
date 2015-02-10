@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import division, print_function
-from ketu.basis import build
+from ketu.k2.basis import build
 
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Build the basis."
+    )
     parser.add_argument("lcs",
                         help=("pattern for the LC files. For example: "
                               "'lightcurves/c1/*/*/*.fits'"))

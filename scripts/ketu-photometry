@@ -5,7 +5,7 @@ from __future__ import division, print_function
 import glob
 from multiprocessing import Pool
 
-from ketu.photometry import run
+from ketu.k2.photometry import run
 
 
 def _wrap(fn):
@@ -24,7 +24,7 @@ if __name__ == "__main__":
 
     parser.add_argument("tpfs",
                         help=("pattern for the TPF files. For example: "
-                              "'data/c1/*/*/*.fits.gz'"))
+                              "'target_pixel_files/c1/*/*/*.fits.gz'"))
     parser.add_argument("output_dir",
                         help="path where the LC files should be saved")
     parser.add_argument("-p", "--parallel", action="store_true",
@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    filenames = glob.glob("data/c1/*/*/*.fits.gz")
+    filenames = glob.glob(args.tpfs)
     if args.parallel:
         pool = Pool()
         pool.map(_wrap, filenames)
