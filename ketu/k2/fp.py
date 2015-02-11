@@ -2,7 +2,7 @@
 
 from __future__ import division, print_function
 
-__all__ = ["Centroid"]
+__all__ = ["FP"]
 
 import numpy as np
 from scipy.linalg import cho_factor, cho_solve
@@ -50,7 +50,7 @@ def find_centroid(img, init=None):
     return ox + xi, oy + yi
 
 
-class Centroid(Pipeline):
+class FP(Pipeline):
 
     query_parameters = {
         "target_pixel_file": (None, True),
@@ -59,7 +59,7 @@ class Centroid(Pipeline):
     def __init__(self, *args, **kwargs):
         if fits is None:
             raise ImportError("astropy is required")
-        super(Centroid, self).__init__(*args, **kwargs)
+        super(FP, self).__init__(*args, **kwargs)
 
     def get_result(self, query, parent_response):
         # Get the light curve object.
@@ -81,23 +81,40 @@ class Centroid(Pipeline):
                     j += 1
 
         return dict(
-            centroid_model=CentroidModel(lc.time, coords, lc.basis)
+            fp_model=FPModel(lc, coords)
         )
 
 
-class CentroidModel(object):
+class FPModel(object):
 
-    def __init__(self, time, coords, basis):
-        self.time = time
+    def __init__(self, lc, coords):
+        self.lc = lc
         self.coords = coords
-        self.basis = basis
 
-        # Estimate the centroid uncertainty.
-        self.sigma = np.median(np.abs(np.diff(self.coords, axis=0)), axis=0)
+    def compute_odd_even(self, period, t0, duration):
+        lc = self.lc
+        model = np.zeros((2, lc.basis.shape[1]))
+        for i in (0, 1):
+            m = np.abs((lc.time - t0 + i * period) % (2 * period) - period
+                       < 0.5 * duration)
+            model[i, m] = -1
+
+        # Compute the offset.
+        A = np.concatenate((lc.basis, model))
+        ATA = np.dot(A, A.T)
+        ATA[np.diag_indices_from(ATA)] += 1e-10
+
+        # Compute the depths and uncertainties.
+        w = np.linalg.solve(ATA, np.dot(A, lc.flux))
+        S = np.linalg.inv(ATA)
+
+        return w[-2:], np.sqrt(np.diag(S[-2:, -2:] / lc.ivar))
 
     def compute_offsets(self, period, t0, duration):
+        lc = self.lc
+
         # Compute the offset.
-        A = np.concatenate((self.basis, np.zeros((1, self.basis.shape[1]))))
+        A = np.concatenate((lc.basis, np.zeros((1, lc.basis.shape[1]))))
         ATA = np.dot(A, A.T)
         ATA[np.diag_indices_from(ATA)] += 1e-10
 
@@ -107,12 +124,12 @@ class CentroidModel(object):
         model.t0 = t0
         num = 0.0
         denom = 0.0
-        while model.t0 < self.time.max():
+        while model.t0 < lc.time.max():
             # Compute the box model.
-            m = model(self.time)
+            m = model(lc.time)
             if np.any(m != 0.0):
                 # Update the matrix.
-                v = np.dot(self.basis, m)
+                v = np.dot(lc.basis, m)
                 ATA[:-1, -1] = v
                 ATA[-1, :-1] = v
                 ATA[-1, -1] = np.dot(m, m)
