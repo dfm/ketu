@@ -92,6 +92,7 @@ class K2LightCurve(object):
 
         # Force contiguity.
         m2 = ~m2
+        self.m[self.m] = m2
         self.time = np.ascontiguousarray(self.time[m2], dtype=np.float64)
         self.flux = np.ascontiguousarray(self.flux[m2], dtype=np.float64)
         self.ferr = np.ascontiguousarray(self.ferr[m2], dtype=np.float64)
