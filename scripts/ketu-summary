@@ -1,0 +1,64 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import division, print_function
+
+import os
+import pandas as pd
+
+import ketu
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("candidate_file",
+                        help=("the path to the candidates saved as a Pandas "
+                              "DataFrame using HDF5"))
+    parser.add_argument("data_dir", help="the path to the data")
+    parser.add_argument("output_dir", help="the output directory")
+    args = parser.parse_args()
+
+    # Load the candidate list.
+    candidates = pd.read_hdf(args.candidate_file, "candidates")
+
+    try:
+        os.makedirs(args.output_dir)
+    except os.error:
+        pass
+
+    # Set up the pipeline.
+    pipe = ketu.k2.Data()
+    pipe = ketu.k2.Likelihood(pipe)
+    pipe = ketu.k2.FP(pipe)
+    pipe = ketu.k2.Summary(pipe)
+    query = dict(
+        basis_file=os.path.join(args.data_dir, "elcs", "c1.h5"),
+        initial_time=1975.,
+        nbasis=150,
+    )
+
+    # Loop over the candidates and save the summary plots.
+    for id_, _ in candidates.groupby("kicid").kicid:
+        epicid = id_.split()[1]
+        rows = candidates[candidates.kicid == id_]
+
+        # Resolve the file names.
+        query["light_curve_file"] = os.path.join(
+            args.data_dir,
+            "lightcurves/c1/{0}00000/{1}000/ktwo{2}-c01_lpd-lc.fits"
+            .format(epicid[:4], epicid[4:6], epicid))
+        query["target_pixel_file"] = os.path.join(
+            args.data_dir,
+            ("target_pixel_files/c1/{0}00000/{1}000/ktwo{2}-c01_lpd-targ"
+             ".fits.gz").format(epicid[:4], epicid[4:6], epicid))
+
+        # Resolve the candidate parameters.
+        query["signals"] = [dict(
+            period=row.period, t0=row.t0, duration=row.duration,
+            depth=row.depth
+        ) for _, row in rows.iterrows()],
+
+        # Run the request.
+        result = pipe.query(**query)
