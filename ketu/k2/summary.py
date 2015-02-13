@@ -22,38 +22,50 @@ class Summary(Pipeline):
 
     query_parameters = dict(
         summary_file=(None, True),
-        tpf_file=(None, True),
         signals=([], False),
+        nboot=(100, False),
     )
 
     def __init__(self, *args, **kwargs):
         if pl is None:
             raise ImportError("matplotlib is required")
+        kwargs["cache"] = kwargs.pop("cache", False)
         super(Summary, self).__init__(*args, **kwargs)
 
     def get_result(self, query, parent_response):
         from matplotlib import rcParams
         rcParams["text.usetex"] = True
+        rcParams["font.size"] = 11.
 
         epic = parent_response.epic
 
-        tpf = fitsio.read(query["tpf_file"])
+        tpf = fitsio.read(parent_response.target_pixel_file)
         lc_data = fitsio.read(query["light_curve_file"])
         x = np.all(lc_data["flux"], axis=1)
         i = np.arange(len(x))[np.isfinite(x)][-1]
-        # xi, yi = x[i], y[i]
 
         # Get the light curve object.
         lc = parent_response.model_light_curves[0]
+        fp_model = parent_response.fp_model
 
-        # Loop over signals and compute the mean model.
+        # Loop over signals, compute the mean model, and the centroid offsets.
+        print("Computing centroid offsets...")
+        off = np.empty(len(query["signals"]))
+        off_boot = np.empty((len(query["signals"]), query["nboot"]))
+
         model = np.zeros_like(lc.time)
-        for row in query["signals"]:
+        for i, row in enumerate(query["signals"]):
             p, t0, d, tau = (row[k] for k in ["period", "t0", "depth",
                                               "duration"])
             hp = 0.5 * p
             m = np.abs((lc.time - t0 + hp) % p - hp) < 0.5*tau
             model[m] -= d
+
+            # Compute the centroid offsets.
+            off[i] = fp_model.compute_offsets(p, t0, tau)
+            for j in range(query["nboot"]):
+                x = np.random.uniform(0, p)
+                off_boot[i, j] = fp_model.compute_offsets(p, x, tau)
 
         # Make the prediction.
         t = lc.time
@@ -173,16 +185,6 @@ class Summary(Pipeline):
                 ax = pl.axes([hspace_l, vspace_b, inner_w,
                               2 * inner_h + vspace_b + vspace_t])
                 img = tpf["FLUX"][i].T
-                ax.imshow(-img, cmap="gray", interpolation="nearest")
-                ax.annotate("frame", **label_dict)
-                ax.set_xlim(-0.5, img.shape[1] - 0.5)
-                ax.set_ylim(-0.5, img.shape[0] - 0.5)
-                ax.set_xticklabels([])
-                ax.set_yticklabels([])
-
-                # Plot the log-tpf.
-                ax = pl.axes([full_w + hspace_l, vspace_b, inner_w,
-                              2 * inner_h + vspace_b + vspace_t])
                 limg = np.nan + np.zeros_like(img)
                 m = np.isfinite(img) & (img > 0)
                 limg[m] = np.log(img[m])
@@ -193,7 +195,26 @@ class Summary(Pipeline):
                 ax.set_xticklabels([])
                 ax.set_yticklabels([])
 
+                # Plot the centroid offsets.
+                ax = pl.axes([full_w + hspace_l, vspace_b + full_h, inner_w,
+                              inner_h])
+                bins = np.linspace(0, off_boot[ntransit].max(), 12)
+                ax.hist(off_boot[ntransit], bins, histtype="step", color="k")
+                ax.axvline(off[ntransit], color=color, lw=1.5, alpha=0.5)
+                ax.set_yticklabels([])
+                ax.set_xlabel("centroid offset [pix]")
+
+                # Plot the even/odd depth.
+                ax = pl.axes([full_w + hspace_l, vspace_b, inner_w,
+                              inner_h])
+                mu, std = fp_model.compute_odd_even(row["period"], row["t0"],
+                                                    row["duration"])
+                ax.errorbar(mu, range(2), xerr=std, fmt="ok", capsize=0)
+                ax.set_yticklabels([])
+                ax.set_xlabel("even/odd depth [ppt]")
+                ax.set_ylim(-0.5, 1.5)
+
                 pdf.savefig(fig)
 
-        pl.close()
+        pl.close(fig)
         return parent_response
