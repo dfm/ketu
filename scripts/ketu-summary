@@ -3,21 +3,27 @@
 
 from __future__ import division, print_function
 
-import os
-import pandas as pd
 
-import ketu
+def _mapper(args):
+    pipe, query = args
+    pipe.query(**query)
 
 
 if __name__ == "__main__":
+    import os
+    import ketu
     import argparse
-    parser = argparse.ArgumentParser()
+    import pandas as pd
+    from multiprocessing import Pool
 
+    parser = argparse.ArgumentParser()
     parser.add_argument("candidate_file",
                         help=("the path to the candidates saved as a Pandas "
                               "DataFrame using HDF5"))
     parser.add_argument("data_dir", help="the path to the data")
     parser.add_argument("output_dir", help="the output directory")
+    parser.add_argument("--clobber", help="overwrite previous results",
+                        action="store_true")
     args = parser.parse_args()
 
     # Load the candidate list.
@@ -40,6 +46,7 @@ if __name__ == "__main__":
     )
 
     # Loop over the candidates and save the summary plots.
+    queries = []
     for id_, _ in candidates.groupby("kicid").kicid:
         epicid = id_.split()[1]
         rows = candidates[candidates.kicid == id_]
@@ -53,12 +60,19 @@ if __name__ == "__main__":
             args.data_dir,
             ("target_pixel_files/c1/{0}00000/{1}000/ktwo{2}-c01_lpd-targ"
              ".fits.gz").format(epicid[:4], epicid[4:6], epicid))
+        query["summary_file"] = os.path.join(
+            args.output_dir, "ktwo{2}-c01_lpd-dv.pdf"
+            .format(epicid[:4], epicid[4:6], epicid))
+        if os.path.exists(query["summary_file"]) and not args.clobber:
+            continue
 
         # Resolve the candidate parameters.
         query["signals"] = [dict(
             period=row.period, t0=row.t0, duration=row.duration,
             depth=row.depth
-        ) for _, row in rows.iterrows()],
+        ) for _, row in rows.iterrows()]
+        queries.append((pipe, dict(query)))
 
-        # Run the request.
-        result = pipe.query(**query)
+    print(len(queries))
+    pool = Pool()
+    pool.map(_mapper, queries)

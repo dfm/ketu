@@ -145,4 +145,6 @@ class FPModel(object):
                 denom += ivar
             model.t0 += period
 
+        if denom == 0.0:
+            return 0.0
         return num / denom

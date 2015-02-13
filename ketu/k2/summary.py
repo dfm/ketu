@@ -23,7 +23,7 @@ class Summary(Pipeline):
     query_parameters = dict(
         summary_file=(None, True),
         signals=([], False),
-        nboot=(100, False),
+        nboot=(400, False),
     )
 
     def __init__(self, *args, **kwargs):
