@@ -1,0 +1,307 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import division, print_function
+
+import os
+import sys
+import h5py
+import time
+import emcee
+import pickle
+import transit
+import traceback
+from IPython.parallel import Client, require
+
+
+import ketu
+
+
+@require(os, sys, traceback, time, pickle, h5py, emcee, transit, ketu)
+def run(args):
+    bp = args[-1]
+
+    # Insane hackish output capturing context.
+    # http://stackoverflow.com/questions/16571150
+    #   /how-to-capture-stdout-output-from-a-python-function-call
+    class Capturing(object):
+
+        def __init__(self, fn):
+            self.fn = fn
+
+        def __enter__(self):
+            self._stdout = sys.stdout
+            sys.stdout = self._fh = open(self.fn, "a")
+            return self
+
+        def __exit__(self, *args):
+            self._fh.close()
+            sys.stdout = self._stdout
+
+    # Execute the pipeline.
+    r, q, pipe = None, None, None
+    try:
+        strt = time.time()
+        with Capturing(os.path.join(bp, "output.log")):
+            do_fit(args)
+
+        with open(os.path.join(bp, "output.log"), "a") as f:
+            f.write("Finished in {0} seconds\n".format(time.time() - strt))
+
+    except:
+        with open(os.path.join(bp, "error.log"), "a") as f:
+            f.write("Error during execution:\n\n")
+            f.write(traceback.format_exc())
+
+
+def do_fit(args):
+    import numpy as np
+    import matplotlib.pyplot as pl
+
+    # Parse the arguments.
+    epicid, candidates, datadir, basis_file, outdir = args
+    outfn = os.path.join(outdir, "chain.h5")
+    if os.path.exists(outfn):
+        return
+
+    try:
+        os.makedirs(outdir)
+    except os.error:
+        pass
+
+    # epicid = "201280613"
+    light_curve_file = os.path.join(
+        datadir,
+        "lightcurves/c1/{0}00000/{1}000/ktwo{2}-c01_lpd-lc.fits"
+        .format(epicid[:4], epicid[4:6], epicid))
+
+    # Set up the pipeline to load the data.
+    pipe = ketu.k2.Data(cache=False)
+    pipe = ketu.k2.Likelihood(pipe, cache=False)
+    query = dict(
+        basis_file=os.path.abspath(basis_file),
+        light_curve_file=os.path.abspath(light_curve_file)
+    )
+    r = pipe.query(**query)
+
+    # Load the data and plot it.
+    lc = r.model_light_curves[0]
+    pl.plot(lc.time, lc.flux, ".k")
+    pl.xlim(lc.time.min(), lc.time.max())
+    pl.xlabel("time")
+    pl.savefig(os.path.join(outdir, "data.png"))
+    pl.close()
+
+    # Set up the initial system model.
+    star = transit.Central()
+    system = transit.System(star)
+    for _, row in candidates.iterrows():
+        system.add_body(transit.Body(r=np.sqrt(row.depth*1e-3),
+                                     period=row.period, t0=row.t0))
+    with open(os.path.join(outdir, "model.pkl"), "wb") as f:
+        pickle.dump(system, f, -1)
+
+    # Define the probabilistic model.
+    class TransitWalker(emcee.BaseWalker):
+
+        def lnpriorfn(self, p):
+            lnrs, lnms, q1, q2 = p[:4]
+
+            if not -3 < lnrs < 3:
+                return -np.inf
+            if not -3 < lnms < 3:
+                return -np.inf
+            if not ((0 < q1 < 1) and (0 < q2 < 1)):
+                return -np.inf
+
+            i = 4
+            for body in system.bodies:
+                lnr, lnp, t0, b, sesn, secs = p[i:i+6]
+                if not 0 <= b < 1.02:
+                    return -np.inf
+                e = sesn**2 + secs**2
+                if not 0 <= e < 1.0:
+                    return -np.inf
+                i += 6
+
+            return 0.0
+
+        def lnlikefn(self, p):
+            # Update the stellar parameters.
+            lnrs, lnms, q1, q2 = p[:4]
+            star.mass = np.exp(lnms)
+            star.radius = np.exp(lnrs)
+            star.q1, star.q2 = q1, q2
+
+            i = 4
+            for planet in system.bodies:
+                lnr, lnp, t0, b, sesn, secs = p[i:i+6]
+                e = sesn**2 + secs**2
+                pomega = np.arctan2(sesn, secs)
+
+                planet.period = np.exp(lnp)
+                planet.r = np.exp(lnr)
+                planet.t0 = t0
+                planet.e = e
+                planet.pomega = pomega
+                try:
+                    planet.b = b
+                except ValueError:
+                    return -np.inf
+                i += 6
+
+            pred = (system.light_curve(lc.time, texp=lc.texp) - 1) * 1e3
+            r = lc.flux - pred
+            r -= lc.predict(r)
+
+            return -0.5 * np.sum(r ** 2) * lc.ivar
+
+        def plot(self, p):
+            # Update the stellar parameters.
+            lnrs, lnms, q1, q2 = p[:4]
+            star.mass = np.exp(lnms)
+            star.radius = np.exp(lnrs)
+            star.q1, star.q2 = q1, q2
+
+            i = 4
+            for planet in system.bodies:
+                lnr, lnp, t0, b, sesn, secs = p[i:i+6]
+                e = sesn**2 + secs**2
+                pomega = np.arctan2(sesn, secs)
+
+                planet.period = np.exp(lnp)
+                planet.r = np.exp(lnr)
+                planet.t0 = t0
+                planet.e = e
+                planet.pomega = pomega
+                try:
+                    planet.b = b
+                except ValueError:
+                    return -np.inf
+                i += 6
+
+            pred = (system.light_curve(lc.time, texp=lc.texp) - 1) * 1e3
+            r = lc.flux - pred
+            bg = lc.predict(r)
+
+            fig = pl.figure(figsize=(6, 3*len(system.bodies)))
+            for i, planet in enumerate(system.bodies):
+                pl.subplot(len(system.bodies), 1, i+1)
+                p = planet.period
+                t0 = planet.t0
+
+                t = np.linspace(-1, 1, 500)
+                pred = (system.light_curve(t + t0, texp=lc.texp) - 1) * 1e3
+                pl.plot(t, pred, "k", lw=0.5)
+                c = (lc.time - lc.time.min()) / (lc.time.max() - lc.time.min())
+                pl.scatter((lc.time-t0+0.5*p) % p-0.5*p, lc.flux-bg, c=c, s=6,
+                           edgecolor="none")
+                pl.xlim(-1, 1)
+
+            return fig
+
+    # Initialize the walkers.
+    p0 = [0.0, 0.0, 0.5, 0.5]
+    for planet in system.bodies:
+        p0 += [np.log(planet.r), np.log(planet.period), planet.t0, 0.1, 0, 0]
+    p0 = np.array(p0)
+
+    # Plot the initial model.
+    fig = TransitWalker().plot(p0)
+    fig.savefig(os.path.join(outdir, "initial.png"))
+    pl.close(fig)
+
+    nwalkers, ndim = 32, len(p0)
+    coords = p0 + 1e-8 * np.random.randn(nwalkers, ndim)
+
+    # Set up the sampler.
+    ensemble = emcee.Ensemble(TransitWalker(), coords)
+    assert np.all(np.isfinite(ensemble.lnprob))
+    sampler = emcee.Sampler()
+
+    for i in range(2):
+        print("Burn-in {0}...".format(i+1))
+        ensemble = sampler.run(ensemble, 2000)
+
+        # Plot the middle model.
+        samples = sampler.get_coords(flat=True)
+        lp = sampler.get_lnprob(flat=True)
+        best_p = samples[np.argmax(lp)]
+        fig = TransitWalker().plot(best_p)
+        fig.savefig(os.path.join(outdir, "mid.{0}.png".format(i+1)))
+        pl.close(fig)
+
+    print("Production...")
+    sampler.reset()
+    ensemble = sampler.run(ensemble, 10000)
+
+    # Save the samples.
+    with h5py.File(outfn, "w") as f:
+        f.create_dataset("chain", data=sampler.get_coords())
+        f.create_dataset("lnprior", data=sampler.get_lnprior())
+        f.create_dataset("lnprob", data=sampler.get_lnprob())
+
+    # Plotting.
+    pl.plot(sampler.get_lnprob(), "k", alpha=0.3)
+    pl.savefig(os.path.join(outdir, "lnprob.png"))
+    pl.close()
+
+    # Plot the final model.
+    samples = sampler.get_coords(flat=True)
+    lp = sampler.get_lnprob(flat=True)
+    best_p = samples[np.argmax(lp)]
+    fig = TransitWalker().plot(best_p)
+    fig.savefig(os.path.join(outdir, "final.png"))
+    pl.close(fig)
+
+
+if __name__ == "__main__":
+    import argparse
+    import pandas as pd
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("candidate_file",
+                        help="a CSV file listing the candidates")
+    parser.add_argument("data_dir", help="the path to the data root")
+    parser.add_argument("basis_file", help="the archive of PCA comps")
+    parser.add_argument("out_dir", help="the output directory")
+    parser.add_argument("-p", "--profile-dir", default=None,
+                        help="the IPython profile dir")
+    args = parser.parse_args()
+
+    # Initialize the pool.
+    c = Client(profile_dir=args.profile_dir)
+    c[:].push(dict(do_fit=do_fit))
+    pool = c.load_balanced_view()
+    jobs = []
+
+    # Loop over candidates.
+    candidates = pd.read_csv(args.candidate_file)
+    for id_, _ in candidates.groupby("kicid"):
+        outdir = os.path.join(args.out_dir, id_.split()[1])
+        try:
+            os.makedirs(outdir)
+        except os.error:
+            pass
+        p = [
+            id_.split()[1], candidates[candidates.kicid == id_],
+            args.data_dir, args.basis_file, outdir,
+        ]
+        jobs.append((outdir, pool.apply(run, p)))
+
+    # Monitor the jobs and check for completion and errors.
+    retrieved = [False] * len(jobs)
+    while not all(retrieved):
+        for i, (fn, j) in enumerate(jobs):
+            if j.ready() and not retrieved[i]:
+                try:
+                    j.get()
+                except Exception as e:
+                    with open(os.path.join(fn, "error.log"), "a") as f:
+                        f.write("Uncaught error:\n\n")
+                        f.write(traceback.format_exc())
+                else:
+                    with open(os.path.join(fn, "success.log"), "w") as f:
+                        f.write("Finished at: {0}\n".format(time.time()))
+                retrieved[i] = True
+        time.sleep(1)
