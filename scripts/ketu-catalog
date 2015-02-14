@@ -1,0 +1,89 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import division, print_function
+
+import os
+import h5py
+import numpy as np
+
+        # def lnlikefn(self, p):
+        #     # Update the stellar parameters.
+        #     lnrs, lnms, q1, q2 = p[:4]
+        #     star.mass = np.exp(lnms)
+        #     star.radius = np.exp(lnrs)
+        #     star.q1, star.q2 = q1, q2
+
+        #     i = 4
+        #     for planet in system.bodies:
+        #         lnr, lnp, t0, b, sesn, secs = p[i:i+6]
+        #         e = sesn**2 + secs**2
+        #         pomega = np.arctan2(sesn, secs)
+
+        #         planet.period = np.exp(lnp)
+        #         planet.r = np.exp(lnr)
+        #         planet.t0 = t0
+        #         planet.e = e
+        #         planet.pomega = pomega
+        #         try:
+        #             planet.b = b
+        #         except ValueError:
+        #             return -np.inf
+        #         i += 6
+
+
+if __name__ == "__main__":
+    import argparse
+    import pandas as pd
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("candidate_file",
+                        help="a CSV file listing the candidates")
+    parser.add_argument("mcmc_dir",
+                        help="the output directory from the MCMC runs")
+    args = parser.parse_args()
+
+    # LaTeX table format.
+    row_tmp = (
+        "{epicid} & "
+        "${period:.4f}_{{-{period_err[0]:.4f}}}^{{+{period_err[1]:.4f}}}$ & "
+        "${t0:.4f}_{{-{t0_err[0]:.4f}}}^{{+{t0_err[1]:.4f}}}$ & "
+        "${ror:.4f}_{{-{ror_err[0]:.4f}}}^{{+{ror_err[1]:.4f}}}$ \\\\ "
+    )
+
+    # Loop over candidates.
+    candidates = pd.read_csv(args.candidate_file)
+    for id_, _ in candidates.groupby("kicid"):
+        outdir = os.path.join(args.mcmc_dir, id_.split()[1])
+        npl = (candidates.kicid == id_).sum()
+
+        with h5py.File(os.path.join(outdir, "chain.h5")) as f:
+            samples = f["chain"][...]
+
+        # Stellar radius.
+        lnrs = samples[:, :, 0]
+
+        # Loop over planets.
+        i = 4
+        for pl in range(npl):
+            lnr = samples[:, :, i]
+            lnp = samples[:, :, i + 1]
+            t0 = samples[:, :, i + 2]
+
+            ror = np.exp(lnr - lnrs).flatten()
+            ror_q = np.percentile(ror, [16, 50, 84])
+            p = np.exp(lnp).flatten()
+            p_q = np.percentile(p, [16, 50, 84])
+            t0_q = np.percentile(t0.flatten(), [16, 50, 84])
+
+            print(row_tmp.format(
+                epicid=id_.split()[1],
+                period=p_q[1],
+                period_err=np.diff(p_q),
+                t0=t0_q[1],
+                t0_err=np.diff(t0_q),
+                ror=ror_q[1],
+                ror_err=np.diff(ror_q),
+            ))
+
+            i += 6
