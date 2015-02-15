@@ -7,30 +7,6 @@ import os
 import h5py
 import numpy as np
 
-        # def lnlikefn(self, p):
-        #     # Update the stellar parameters.
-        #     lnrs, lnms, q1, q2 = p[:4]
-        #     star.mass = np.exp(lnms)
-        #     star.radius = np.exp(lnrs)
-        #     star.q1, star.q2 = q1, q2
-
-        #     i = 4
-        #     for planet in system.bodies:
-        #         lnr, lnp, t0, b, sesn, secs = p[i:i+6]
-        #         e = sesn**2 + secs**2
-        #         pomega = np.arctan2(sesn, secs)
-
-        #         planet.period = np.exp(lnp)
-        #         planet.r = np.exp(lnr)
-        #         planet.t0 = t0
-        #         planet.e = e
-        #         planet.pomega = pomega
-        #         try:
-        #             planet.b = b
-        #         except ValueError:
-        #             return -np.inf
-        #         i += 6
-
 
 if __name__ == "__main__":
     import argparse
