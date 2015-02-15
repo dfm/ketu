@@ -5,6 +5,7 @@ from __future__ import division, print_function
 
 import os
 import h5py
+import fitsio
 import numpy as np
 
 
@@ -17,6 +18,10 @@ if __name__ == "__main__":
                         help="a CSV file listing the candidates")
     parser.add_argument("mcmc_dir",
                         help="the output directory from the MCMC runs")
+    parser.add_argument("tex_out",
+                        help="the to save the tex table")
+    parser.add_argument("fits_out",
+                        help="the to save the machine readable table")
     args = parser.parse_args()
 
     # LaTeX table format.
@@ -26,6 +31,25 @@ if __name__ == "__main__":
         "${t0:.4f}_{{-{t0_err[0]:.4f}}}^{{+{t0_err[1]:.4f}}}$ & "
         "${ror:.4f}_{{-{ror_err[0]:.4f}}}^{{+{ror_err[1]:.4f}}}$ \\\\ "
     )
+    tex_rows = []
+    fits_rows = []
+
+    dtype = [("epicid", int)] + [(k, float) for k in (
+        "ln_R_star", "ln_R_star_minus", "ln_R_star_plus",
+        "ln_M_star", "ln_M_star_minus", "ln_M_star_plus",
+        "q1", "q1_minus", "q1_plus",
+        "q2", "q2_minus", "q2_plus",
+        "ln_R_p", "ln_R_p_minus", "ln_R_p_plus",
+        "ln_P", "ln_P_minus", "ln_P_plus",
+        "t0", "t0_minus", "t0_plus",
+        "b", "b_minus", "b_plus",
+        "sqrt_e_sin_omega", "sqrt_e_sin_omega_minus", "sqrt_e_sin_omega_plus",
+        "sqrt_e_cos_omega", "sqrt_e_cos_omega_minus", "sqrt_e_cos_omega_plus",
+        "comp_period", "comp_period_minus", "comp_period_plus",
+        "comp_ror", "comp_ror_minus", "comp_ror_plus",
+        "comp_e", "comp_e_minus", "comp_e_plus",
+        "comp_omega", "comp_omega_minus", "comp_omega_plus",
+    )]
 
     # Loop over candidates.
     candidates = pd.read_csv(args.candidate_file)
@@ -38,6 +62,14 @@ if __name__ == "__main__":
 
         # Stellar radius.
         lnrs = samples[:, :, 0]
+        lnms = samples[:, :, 1]
+        q1 = samples[:, :, 2]
+        q2 = samples[:, :, 3]
+
+        lnrs_q = np.percentile(lnrs, [16, 50, 84])
+        lnms_q = np.percentile(lnms, [16, 50, 84])
+        q1_q = np.percentile(q1, [16, 50, 84])
+        q2_q = np.percentile(q2, [16, 50, 84])
 
         # Loop over planets.
         i = 4
@@ -45,14 +77,27 @@ if __name__ == "__main__":
             lnr = samples[:, :, i]
             lnp = samples[:, :, i + 1]
             t0 = samples[:, :, i + 2]
+            b = samples[:, :, i + 3]
+            sesn = samples[:, :, i + 4]
+            secs = samples[:, :, i + 5]
 
-            ror = np.exp(lnr - lnrs).flatten()
-            ror_q = np.percentile(ror, [16, 50, 84])
+            lnr_q = np.percentile(lnr, [16, 50, 84])
+            lnp_q = np.percentile(lnp, [16, 50, 84])
+            t0_q = np.percentile(t0.flatten(), [16, 50, 84])
+            b_q = np.percentile(b.flatten(), [16, 50, 84])
+            sesn_q = np.percentile(sesn.flatten(), [16, 50, 84])
+            secs_q = np.percentile(secs.flatten(), [16, 50, 84])
+
             p = np.exp(lnp).flatten()
             p_q = np.percentile(p, [16, 50, 84])
-            t0_q = np.percentile(t0.flatten(), [16, 50, 84])
+            ror = np.exp(lnr - lnrs).flatten()
+            ror_q = np.percentile(ror, [16, 50, 84])
+            e = sesn**2 + secs**2
+            e_q = np.percentile(e, [16, 50, 84])
+            pomega = np.arctan2(sesn, secs)
+            pomega_q = np.percentile(pomega, [16, 50, 84])
 
-            print(row_tmp.format(
+            tex_rows.append(row_tmp.format(
                 epicid=id_.split()[1],
                 period=p_q[1],
                 period_err=np.diff(p_q),
@@ -62,4 +107,70 @@ if __name__ == "__main__":
                 ror_err=np.diff(ror_q),
             ))
 
+            fits_rows.append((
+                int(id_.split()[1]),
+
+                lnrs_q[1],
+                np.diff(lnrs_q)[0],
+                np.diff(lnrs_q)[1],
+
+                lnms_q[1],
+                np.diff(lnms_q)[0],
+                np.diff(lnms_q)[1],
+
+                q1_q[1],
+                np.diff(q1_q)[0],
+                np.diff(q1_q)[1],
+
+                q2_q[1],
+                np.diff(q2_q)[0],
+                np.diff(q2_q)[1],
+
+                lnr_q[1],
+                np.diff(lnr_q)[0],
+                np.diff(lnr_q)[1],
+
+                lnp_q[1],
+                np.diff(lnp_q)[0],
+                np.diff(lnp_q)[1],
+
+                t0_q[1],
+                np.diff(t0_q)[0],
+                np.diff(t0_q)[1],
+
+                b_q[1],
+                np.diff(b_q)[0],
+                np.diff(b_q)[1],
+
+                sesn_q[1],
+                np.diff(sesn_q)[0],
+                np.diff(sesn_q)[1],
+
+                secs_q[1],
+                np.diff(secs_q)[0],
+                np.diff(secs_q)[1],
+
+                p_q[1],
+                np.diff(p_q)[0],
+                np.diff(p_q)[1],
+
+                ror_q[1],
+                np.diff(ror_q)[0],
+                np.diff(ror_q)[1],
+
+                e_q[1],
+                np.diff(e_q)[0],
+                np.diff(e_q)[1],
+
+                pomega_q[1],
+                np.diff(pomega_q)[0],
+                np.diff(pomega_q)[1],
+            ))
+
             i += 6
+
+    with open(args.tex_out, "w") as f:
+        f.write("\n".join(tex_rows))
+
+    fitsio.write(args.fits_out, np.array(fits_rows, dtype=dtype),
+                 clobber=True)
