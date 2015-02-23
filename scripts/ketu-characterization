@@ -61,8 +61,14 @@ def do_fit(args):
     # Parse the arguments.
     epicid, candidates, datadir, basis_file, outdir = args
     outfn = os.path.join(outdir, "chain.h5")
+    p0 = None
     if os.path.exists(outfn):
-        return
+        with h5py.File(outfn, "r") as f:
+            samples = f["chain"]
+            p0 = samples[-1, :, :]
+            # lnprob = f["lnprob"]
+            # c = np.unravel_index(np.argmax(lnprob), lnprob.shape)
+            # p0 = samples[c]
 
     try:
         os.makedirs(outdir)
@@ -201,39 +207,51 @@ def do_fit(args):
             return fig
 
     # Initialize the walkers.
-    p0 = [0.0, 0.0, 0.5, 0.5]
-    for planet in system.bodies:
-        p0 += [np.log(planet.r), np.log(planet.period), planet.t0, 0.1, 0, 0]
-    p0 = np.array(p0)
+    if p0 is None:
+        p0 = [0.0, 0.0, 0.5, 0.5]
+        for planet in system.bodies:
+            p0 += [np.log(planet.r), np.log(planet.period), planet.t0, 0.1,
+                   0, 0]
+        p0 = np.array(p0)
 
-    # Plot the initial model.
-    fig = TransitWalker().plot(p0)
-    fig.savefig(os.path.join(outdir, "initial.png"))
-    pl.close(fig)
+        # Plot the initial model.
+        fig = TransitWalker().plot(p0)
+        fig.savefig(os.path.join(outdir, "initial.png"))
+        pl.close(fig)
 
-    nwalkers, ndim = 32, len(p0)
-    coords = p0 + 1e-8 * np.random.randn(nwalkers, ndim)
+        nwalkers, ndim = 32, len(p0)
+        coords = p0 + 1e-8 * np.random.randn(nwalkers, ndim)
 
-    # Set up the sampler.
-    ensemble = emcee.Ensemble(TransitWalker(), coords)
-    assert np.all(np.isfinite(ensemble.lnprob))
-    sampler = emcee.Sampler()
+        # Set up the sampler.
+        ensemble = emcee.Ensemble(TransitWalker(), coords)
+        assert np.all(np.isfinite(ensemble.lnprob))
+        sampler = emcee.Sampler()
 
-    for i in range(2):
-        print("Burn-in {0}...".format(i+1))
-        ensemble = sampler.run(ensemble, 2000)
+        for i in range(2 * (len(candidates) + 1)):
+            print("Burn-in {0}...".format(i+1))
+            ensemble = sampler.run(ensemble, 2000)
 
-        # Plot the middle model.
-        samples = sampler.get_coords(flat=True)
-        lp = sampler.get_lnprob(flat=True)
-        best_p = samples[np.argmax(lp)]
-        fig = TransitWalker().plot(best_p)
-        fig.savefig(os.path.join(outdir, "mid.{0}.png".format(i+1)))
+            # Plot the middle model.
+            samples = sampler.get_coords(flat=True)
+            lp = sampler.get_lnprob(flat=True)
+            best_p = samples[np.argmax(lp)]
+            fig = TransitWalker().plot(best_p)
+            fig.savefig(os.path.join(outdir, "mid.{0}.png".format(i+1)))
+            pl.close(fig)
+        sampler.reset()
+    else:
+        print("Restarting...")
+        ensemble = emcee.Ensemble(TransitWalker(), p0)
+        assert np.all(np.isfinite(ensemble.lnprob))
+        sampler = emcee.Sampler()
+
+        # Plot the initial model.
+        fig = TransitWalker().plot(p0[0])
+        fig.savefig(os.path.join(outdir, "restart.png"))
         pl.close(fig)
 
     print("Production...")
-    sampler.reset()
-    ensemble = sampler.run(ensemble, 10000)
+    ensemble = sampler.run(ensemble, 50000 * (len(candidates) + 1))
 
     # Save the samples.
     with h5py.File(outfn, "w") as f:
