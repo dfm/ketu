@@ -46,6 +46,7 @@ if __name__ == "__main__":
         "sqrt_e_sin_omega", "sqrt_e_sin_omega_minus", "sqrt_e_sin_omega_plus",
         "sqrt_e_cos_omega", "sqrt_e_cos_omega_minus", "sqrt_e_cos_omega_plus",
         "comp_period", "comp_period_minus", "comp_period_plus",
+        "comp_ln_ror", "comp_ln_ror_minus", "comp_ln_ror_plus",
         "comp_ror", "comp_ror_minus", "comp_ror_plus",
         "comp_e", "comp_e_minus", "comp_e_plus",
         "comp_omega", "comp_omega_minus", "comp_omega_plus",
@@ -90,7 +91,9 @@ if __name__ == "__main__":
 
             p = np.exp(lnp).flatten()
             p_q = np.percentile(p, [16, 50, 84])
-            ror = np.exp(lnr - lnrs).flatten()
+            lnror = lnr - lnrs
+            lnror_q = np.percentile(lnror, [16, 50, 84])
+            ror = np.exp(lnror).flatten()
             ror_q = np.percentile(ror, [16, 50, 84])
             e = sesn**2 + secs**2
             e_q = np.percentile(e, [16, 50, 84])
@@ -153,6 +156,10 @@ if __name__ == "__main__":
                 p_q[1],
                 np.diff(p_q)[0],
                 np.diff(p_q)[1],
+
+                lnror_q[1],
+                np.diff(lnror_q)[0],
+                np.diff(lnror_q)[1],
 
                 ror_q[1],
                 np.diff(ror_q)[0],
