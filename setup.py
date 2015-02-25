@@ -26,6 +26,8 @@ exts = [
               **kwargs),
     Extension("ketu._grid_search", sources=["ketu/_grid_search.pyx"],
               **kwargs),
+    Extension("ketu._traptransit", sources=["ketu/_traptransit.pyx"],
+              **kwargs),
 ]
 
 # Hackishly inject a constant into builtins to enable importing of the
@@ -60,6 +62,7 @@ setup(
         "scripts/ketu-catalog",
         "scripts/ketu-summary",
         "scripts/ketu-characterization",
+        "scripts/ketu-traptransit",
     ],
     url="http://github.com/dfm/ketu",
     license="MIT",
