@@ -5,16 +5,27 @@ from __future__ import division, print_function
 import os
 import ketu
 import h5py
+import numpy as np
 import pandas as pd
 from IPython.parallel import Client, require
 
 
-@require(ketu, h5py)
+@require(os, ketu, h5py)
 def do_fit(args):
+    import triangle
+    import matplotlib.pyplot as pl
     lc, period, t0, depth, fn = args
-    samples = ketu.k2.fit_traptransit(lc, period, t0, depth)
+    samples, fig = ketu.k2.fit_traptransit(lc, period, t0, depth)
+    fig.savefig(os.path.splitext(fn)[0] + "-lc.png")
+    pl.close(fig)
+
     with h5py.File(fn, "w") as f:
         f.create_dataset("samples", data=samples)
+
+    labels = ["T", "depth", "T/tau", "period", "t0"] * len(period)
+    fig = triangle.corner(samples, labels=labels)
+    fig.savefig(os.path.splitext(fn)[0] + "-triangle.png")
+    pl.close(fig)
 
 
 if __name__ == "__main__":
@@ -37,33 +48,34 @@ if __name__ == "__main__":
     candidates = pd.read_csv(args.candidate_file)
     for id_, _ in candidates.groupby("kicid"):
         rows = candidates[candidates.kicid == id_]
-        for i, (_, row) in enumerate(rows.iterrows()):
-            epicid = row.kicid.split()[1]
-            try:
-                os.makedirs(args.out_dir)
-            except os.error:
-                pass
 
-            light_curve_file = os.path.join(
-                args.data_dir,
-                "lightcurves/c1/{0}00000/{1}000/ktwo{2}-c01_lpd-lc.fits"
-                .format(epicid[:4], epicid[4:6], epicid))
+        epicid = id_.split()[1]
+        try:
+            os.makedirs(args.out_dir)
+        except os.error:
+            pass
 
-            # Set up the pipeline to load the data.
-            pipe = ketu.k2.Data(cache=False)
-            pipe = ketu.k2.Likelihood(pipe, cache=False)
-            query = dict(
-                basis_file=os.path.abspath(args.basis_file),
-                light_curve_file=os.path.abspath(light_curve_file),
-                nbasis=150,
-                initial_time=1975.,
-            )
-            r = pipe.query(**query)
-            lc = r.model_light_curves[0]
-            fn = os.path.join(args.out_dir, epicid + "abc"[i] + ".h5")
+        light_curve_file = os.path.join(
+            args.data_dir,
+            "lightcurves/c1/{0}00000/{1}000/ktwo{2}-c01_lpd-lc.fits"
+            .format(epicid[:4], epicid[4:6], epicid))
 
-            p = [lc, row.period, row.t0, row.depth, fn]
-            jobs.append(pool.apply(do_fit, p))
+        # Set up the pipeline to load the data.
+        pipe = ketu.k2.Data(cache=False)
+        pipe = ketu.k2.Likelihood(pipe, cache=False)
+        query = dict(
+            basis_file=os.path.abspath(args.basis_file),
+            light_curve_file=os.path.abspath(light_curve_file),
+            nbasis=150,
+            initial_time=1975.,
+        )
+        r = pipe.query(**query)
+        lc = r.model_light_curves[0]
+        fn = os.path.join(args.out_dir, epicid + ".h5")
+
+        p = [lc, np.array(rows.period), np.array(rows.t0),
+             np.array(rows.depth) * 1e-3, fn]
+        jobs.append(pool.apply(do_fit, p))
 
     for job in jobs:
         job.get()
