@@ -1,0 +1,89 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import division, print_function
+import os
+import ketu
+import h5py
+import numpy as np
+import pandas as pd
+
+from ketu._grid_search import grid_search
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("candidate_file",
+                        help="a CSV file listing the candidates")
+    parser.add_argument("data_dir", help="the path to the data root")
+    parser.add_argument("basis_file", help="the archive of PCA comps")
+    parser.add_argument("out_file", help="output file")
+    args = parser.parse_args()
+
+    with open(args.out_file, "w") as f:
+        pass
+
+    candidates = pd.read_csv(args.candidate_file)
+    for _, row in candidates.iterrows():
+        epicid = row.kicid.split()[1]
+
+        light_curve_file = os.path.join(
+            args.data_dir,
+            "lightcurves/c1/{0}00000/{1}000/ktwo{2}-c01_lpd-lc.fits"
+            .format(epicid[:4], epicid[4:6], epicid))
+
+        # Set up the pipeline to load the data.
+        pipe = ketu.k2.Data(cache=False)
+        pipe = ketu.k2.Likelihood(pipe, cache=False)
+        pipe = ketu.OneDSearch(pipe, cache=False)
+        query = dict(
+            basis_file=os.path.abspath(args.basis_file),
+            light_curve_file=os.path.abspath(light_curve_file),
+            nbasis=150,
+            initial_time=1975.,
+            durations=[0.05, 0.1, 0.2],
+            time_spacing=0.02,
+        )
+        r = pipe.query(**query)
+
+        # Do the grid search.
+        time_spacing = r.time_spacing
+        mean_time = r.mean_time_1d
+        tmin = r.min_time_1d - mean_time
+        tmax = r.max_time_1d - mean_time
+        time_grid = np.arange(0, tmax-tmin, time_spacing)
+
+        depth_1d = np.array(r.depth_1d)
+        depth_ivar_1d = np.array(r.depth_ivar_1d)
+        dll_1d = np.array(r.dll_1d)
+        alpha = 150 * np.log(len(r.model_light_curves[0].time))
+        dt = query["time_spacing"]
+
+        # First search.
+        results = grid_search(alpha, tmin, tmax, time_spacing, depth_1d,
+                              depth_ivar_1d, dll_1d, np.array([row.period]),
+                              dt)
+        t0_2d, phic_same, phic_same_2, phic_variable, depth_2d, depth_ivar_2d \
+            = results
+        i = np.argmax(depth_2d[0])
+        prim = depth_2d[0, i], t0_2d[0, i]
+
+        # Second search.
+        m = (np.abs((time_grid-prim[1]+0.5*row.period) % row.period
+             - 0.5*row.period) < 0.5)
+        depth_1d[m] = 0.0
+        depth_ivar_1d[m] = 0.0
+        dll_1d[m] = 0.0
+        results = grid_search(alpha, tmin, tmax, time_spacing, depth_1d,
+                              depth_ivar_1d, dll_1d, np.array([row.period]),
+                              dt)
+        t0_2d, phic_same, phic_same_2, phic_variable, depth_2d, depth_ivar_2d \
+            = results
+        i = np.argmax(depth_2d[0])
+        scnd = depth_2d[0, i], t0_2d[0, i]
+
+        with open(args.out_file, "a") as f:
+            f.write("{0},{1},{2[0]},{2[1]},{3[0]},{3[1]}\n"
+                    .format(epicid, row.period, prim, scnd))

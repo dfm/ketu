@@ -61,21 +61,19 @@ def do_fit(args):
     # Parse the arguments.
     epicid, candidates, datadir, basis_file, outdir = args
     outfn = os.path.join(outdir, "chain.h5")
-    p0 = None
+    p0, orig_samples = None, None
     if os.path.exists(outfn):
         with h5py.File(outfn, "r") as f:
-            samples = f["chain"]
-            p0 = samples[-1, :, :]
-            # lnprob = f["lnprob"]
-            # c = np.unravel_index(np.argmax(lnprob), lnprob.shape)
-            # p0 = samples[c]
+            orig_samples = f["chain"][:, :, :]
+            orig_lnprior = f["lnprior"][:, :]
+            orig_lnprob = f["lnprob"][:, :]
+            p0 = orig_samples[-1, :, :]
 
     try:
         os.makedirs(outdir)
     except os.error:
         pass
 
-    # epicid = "201280613"
     light_curve_file = os.path.join(
         datadir,
         "lightcurves/c1/{0}00000/{1}000/ktwo{2}-c01_lpd-lc.fits"
@@ -255,12 +253,16 @@ def do_fit(args):
 
     # Save the samples.
     with h5py.File(outfn, "w") as f:
-        f.create_dataset("chain", data=sampler.get_coords())
-        f.create_dataset("lnprior", data=sampler.get_lnprior())
-        f.create_dataset("lnprob", data=sampler.get_lnprob())
+        f.create_dataset("chain", data=np.concatenate([
+            orig_samples, sampler.get_coords()], axis=0))
+        f.create_dataset("lnprior", data=np.concatenate([
+            orig_lnprior, sampler.get_lnprior()], axis=0))
+        f.create_dataset("lnprob", data=np.concatenate([
+            orig_lnprob, sampler.get_lnprob()], axis=0))
 
     # Plotting.
-    pl.plot(sampler.get_lnprob(), "k", alpha=0.3)
+    pl.plot(np.concatenate([orig_lnprob, sampler.get_lnprob()], axis=0), "k",
+            alpha=0.3)
     pl.savefig(os.path.join(outdir, "lnprob.png"))
     pl.close()
 
@@ -296,6 +298,7 @@ if __name__ == "__main__":
     # Loop over candidates.
     candidates = pd.read_csv(args.candidate_file)
     for id_, _ in candidates.groupby("kicid"):
+        # for id_ in ["EPIC 201367065"]:
         outdir = os.path.join(args.out_dir, id_.split()[1])
         try:
             os.makedirs(outdir)
