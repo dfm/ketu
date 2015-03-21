@@ -25,8 +25,6 @@ if __name__ == "__main__":
     parser.add_argument("tpfs",
                         help=("pattern for the TPF files. For example: "
                               "'target_pixel_files/c1/*/*/*.fits.gz'"))
-    parser.add_argument("output_dir",
-                        help="path where the LC files should be saved")
     parser.add_argument("-p", "--parallel", action="store_true",
                         help="should this be run in parallel?")
 
