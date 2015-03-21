@@ -5,28 +5,33 @@ from __future__ import division, print_function, unicode_literals
 __all__ = ["Data"]
 
 import os
-import kplr
 import h5py
 import fitsio
 import numpy as np
 from scipy.linalg import cho_solve, cho_factor
 
 from ..pipeline import Pipeline
+from .epic import Catalog
 
 
 class Data(Pipeline):
 
     query_parameters = {
         "light_curve_file": (None, True),
+        "catalog_file": (None, True),
         "initial_time": (1975., False)
     }
 
     def get_result(self, query, parent_response):
-        client = kplr.API()
         fn = query["light_curve_file"]
         epicid = os.path.split(fn)[-1].split("-")[0][4:]
+
+        # Query the EPIC.
+        cat = Catalog(query["catalog_file"]).df
+        _, star = cat[cat.epic_number == int(epicid)].iterrows().next()
+
         return dict(
-            epic=client.k2_star(int(epicid)),
+            epic=star,
             target_light_curves=[K2LightCurve(fn,
                                               time0=query["initial_time"])],
         )

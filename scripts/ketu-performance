@@ -1,0 +1,74 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import division, print_function
+
+import ketu
+
+def process_star(catalog_file, basis_file, fn):
+    try:
+        pipe = ketu.k2.Data(cache=False)
+        pipe = ketu.k2.Likelihood(pipe, cache=False)
+
+        query = dict(
+            light_curve_file=fn,
+            basis_file=basis_file,
+            catalog_file=catalog_file,
+            nbasis=150,
+        )
+
+        r = pipe.query(**query)
+
+        mag = r.epic.k2_kepmag
+        lc = r.model_light_curves[0]
+        mu = lc.predict()
+        cdpp0 = ketu.cdpp.compute_cdpp(lc.time, lc.flux*1e-3 + 1, 6.)
+        cdpp1 = ketu.cdpp.compute_cdpp(lc.time, (lc.flux - mu) * 1e-3 + 1, 6.)
+
+        return r.epic.epic_number, mag, cdpp0, cdpp1
+
+    except Exception as e:
+        print("ERROR:", fn)
+        print(e)
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+if __name__ == "__main__":
+    import glob
+    import argparse
+    import numpy as np
+    import pandas as pd
+    from functools import partial
+    from multiprocessing import Pool
+
+    parser = argparse.ArgumentParser(
+        description="test the performance"
+    )
+    parser.add_argument("lcs",
+                        help=("pattern for the LC files. For example: "
+                              "'lightcurves/c1/*/*/*.fits'"))
+    parser.add_argument("basis_file",
+                        help="the path to the basis file")
+    parser.add_argument("catalog_file",
+                        help="the path to the catalog file")
+    parser.add_argument("outfile",
+                        help=("path where the performance metric should be "
+                              "saved"))
+    args = parser.parse_args()
+
+    # Find the files.
+    fns = glob.glob(args.lcs)
+
+    # Run the analysis in parallel.
+    pool = Pool()
+    f = partial(process_star, args.catalog_file, args.basis_file)
+    results = np.array(filter(lambda x: x is not None, pool.map(f, fns)),
+                       dtype=[("epicid", int), ("kepmag", float),
+                              ("cdpp6_raw", float), ("cdpp6_corr", float)])
+    print(len(results))
+
+    # Save the output.
+    df = pd.DataFrame(results)
+    df.to_hdf(args.outfile, "performance")

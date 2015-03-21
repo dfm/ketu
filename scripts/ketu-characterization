@@ -57,9 +57,11 @@ def run(args):
 def do_fit(args):
     import numpy as np
     import matplotlib.pyplot as pl
+    from scipy.linalg import cho_factor, cho_solve
 
     # Parse the arguments.
-    epicid, candidates, datadir, basis_file, outdir = args
+    epicid, candidates, mean, covar, datadir, basis_file, outdir = args
+    cov_factor = cho_factor(covar)
     outfn = os.path.join(outdir, "chain.h5")
     p0, orig_samples = None, None
     if os.path.exists(outfn):
@@ -78,13 +80,15 @@ def do_fit(args):
         datadir,
         "lightcurves/c1/{0}00000/{1}000/ktwo{2}-c01_lpd-lc.fits"
         .format(epicid[:4], epicid[4:6], epicid))
+    catalog_file = os.path.join(datadir, "catalogs/epic.h5")
 
     # Set up the pipeline to load the data.
     pipe = ketu.k2.Data(cache=False)
     pipe = ketu.k2.Likelihood(pipe, cache=False)
     query = dict(
         basis_file=os.path.abspath(basis_file),
-        light_curve_file=os.path.abspath(light_curve_file)
+        light_curve_file=os.path.abspath(light_curve_file),
+        catalog_file=os.path.abspath(catalog_file),
     )
     r = pipe.query(**query)
 
@@ -100,7 +104,7 @@ def do_fit(args):
     star = transit.Central()
     system = transit.System(star)
     for _, row in candidates.iterrows():
-        system.add_body(transit.Body(r=np.sqrt(row.depth*1e-3),
+        system.add_body(transit.Body(r=np.sqrt(row.depth*1e-3)*mean[0],
                                      period=row.period, t0=row.t0))
     with open(os.path.join(outdir, "model.pkl"), "wb") as f:
         pickle.dump(system, f, -1)
@@ -109,7 +113,7 @@ def do_fit(args):
     class TransitWalker(emcee.BaseWalker):
 
         def lnpriorfn(self, p):
-            lnrs, lnms, q1, q2 = p[:4]
+            lnrs, lnms, lnteff, q1, q2 = p[:5]
 
             if not -3 < lnrs < 3:
                 return -np.inf
@@ -118,26 +122,31 @@ def do_fit(args):
             if not ((0 < q1 < 1) and (0 < q2 < 1)):
                 return -np.inf
 
-            i = 4
+            i = 5
             for body in system.bodies:
                 lnr, lnp, t0, b, sesn, secs = p[i:i+6]
-                if not 0 <= b < 1.02:
+                if not 0 <= b < 1.1:
                     return -np.inf
                 e = sesn**2 + secs**2
                 if not 0 <= e < 1.0:
                     return -np.inf
                 i += 6
 
-            return 0.0
+            # Measurements of the stellar parameters.
+            r = np.exp(p[:3]) - mean
+            lp = -0.5 * np.dot(r, cho_solve(cov_factor, r))
+
+            # Correct for log sampling.
+            return lp  # + np.sum(p[:3])
 
         def lnlikefn(self, p):
             # Update the stellar parameters.
-            lnrs, lnms, q1, q2 = p[:4]
+            lnrs, lnms, lnteff, q1, q2 = p[:5]
             star.mass = np.exp(lnms)
             star.radius = np.exp(lnrs)
             star.q1, star.q2 = q1, q2
 
-            i = 4
+            i = 5
             for planet in system.bodies:
                 lnr, lnp, t0, b, sesn, secs = p[i:i+6]
                 e = sesn**2 + secs**2
@@ -162,12 +171,12 @@ def do_fit(args):
 
         def plot(self, p):
             # Update the stellar parameters.
-            lnrs, lnms, q1, q2 = p[:4]
+            lnrs, lnms, lnteff, q1, q2 = p[:5]
             star.mass = np.exp(lnms)
             star.radius = np.exp(lnrs)
             star.q1, star.q2 = q1, q2
 
-            i = 4
+            i = 5
             for planet in system.bodies:
                 lnr, lnp, t0, b, sesn, secs = p[i:i+6]
                 e = sesn**2 + secs**2
@@ -206,7 +215,7 @@ def do_fit(args):
 
     # Initialize the walkers.
     if p0 is None:
-        p0 = [0.0, 0.0, 0.5, 0.5]
+        p0 = list(np.log(mean)) + [0.5, 0.5]
         for planet in system.bodies:
             p0 += [np.log(planet.r), np.log(planet.period), planet.t0, 0.1,
                    0, 0]
@@ -217,7 +226,7 @@ def do_fit(args):
         fig.savefig(os.path.join(outdir, "initial.png"))
         pl.close(fig)
 
-        nwalkers, ndim = 32, len(p0)
+        nwalkers, ndim = 42, len(p0)
         coords = p0 + 1e-8 * np.random.randn(nwalkers, ndim)
 
         # Set up the sampler.
@@ -251,6 +260,23 @@ def do_fit(args):
     print("Production...")
     ensemble = sampler.run(ensemble, 50000 * (len(candidates) + 1))
 
+    # Deal with first run.
+    if orig_samples is None:
+        x = sampler.get_coords()
+        s = list(x.shape)
+        s[0] = 0
+        orig_samples = np.empty(s)
+
+        x = sampler.get_lnprior()
+        s = list(x.shape)
+        s[0] = 0
+        orig_lnprior = np.empty(s)
+
+        x = sampler.get_lnprob()
+        s = list(x.shape)
+        s[0] = 0
+        orig_lnprob = np.empty(s)
+
     # Save the samples.
     with h5py.File(outfn, "w") as f:
         f.create_dataset("chain", data=np.concatenate([
@@ -277,11 +303,14 @@ def do_fit(args):
 
 if __name__ == "__main__":
     import argparse
+    import numpy as np
     import pandas as pd
 
     parser = argparse.ArgumentParser()
     parser.add_argument("candidate_file",
                         help="a CSV file listing the candidates")
+    parser.add_argument("stellar_file",
+                        help="an HDF5 file with the stellar parameters")
     parser.add_argument("data_dir", help="the path to the data root")
     parser.add_argument("basis_file", help="the archive of PCA comps")
     parser.add_argument("out_dir", help="the output directory")
@@ -295,17 +324,32 @@ if __name__ == "__main__":
     pool = c.load_balanced_view()
     jobs = []
 
+    # Load the stellar parameters.
+    with h5py.File(args.stellar_file, "r") as f:
+        ids = f["ids"][...]
+        mu = f["mu"][...]
+        cov = f["cov"][...]
+
     # Loop over candidates.
     candidates = pd.read_csv(args.candidate_file)
+    # for id_ in ["EPIC 201367065"]:
     for id_, _ in candidates.groupby("kicid"):
-        # for id_ in ["EPIC 201367065"]:
-        outdir = os.path.join(args.out_dir, id_.split()[1])
+        epicid = id_.split()[1]
+
+        # Get the stellar parameters.
+        m = ids == int(epicid)
+        if not np.any(m):
+            continue
+        i = np.argmax(m)
+
+        outdir = os.path.join(args.out_dir, epicid)
         try:
             os.makedirs(outdir)
         except os.error:
             pass
         p = [
             id_.split()[1], candidates[candidates.kicid == id_],
+            mu[i], cov[i],
             args.data_dir, args.basis_file, outdir,
         ]
         jobs.append((outdir, pool.apply(run, p)))

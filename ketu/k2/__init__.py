@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
-__all__ = ["photometry", "Data", "Inject", "Likelihood", "Summary", "FP",
-           "fit_traptransit"]
+__all__ = ["photometry", "epic", "Data", "Inject", "Likelihood", "Summary",
+           "FP", "fit_traptransit"]
 
-from . import photometry
+from . import photometry, epic
 
 from .data import Data
 from .inject import Inject
