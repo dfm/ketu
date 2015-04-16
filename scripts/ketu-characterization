@@ -71,6 +71,12 @@ def do_fit(args):
             orig_lnprob = f["lnprob"][:, :]
             p0 = orig_samples[-1, :, :]
 
+    # Dilution. HACK HACK HACK HACK
+    if epicid == "201828749":
+        dilution = 0.84
+    else:
+        dilution = 1.0
+
     try:
         os.makedirs(outdir)
     except os.error:
@@ -125,7 +131,7 @@ def do_fit(args):
             i = 5
             for body in system.bodies:
                 lnr, lnp, t0, b, sesn, secs = p[i:i+6]
-                if not 0 <= b < 1.1:
+                if not 0 <= b < 2.0:
                     return -np.inf
                 e = sesn**2 + secs**2
                 if not 0 <= e < 1.0:
@@ -163,7 +169,9 @@ def do_fit(args):
                     return -np.inf
                 i += 6
 
-            pred = (system.light_curve(lc.time, texp=lc.texp) - 1) * 1e3
+            mod = dilution * system.light_curve(lc.time, texp=lc.texp)
+            mod += 1.0 - dilution
+            pred = (mod - 1) * 1e3
             r = lc.flux - pred
             r -= lc.predict(r)
 
@@ -193,7 +201,9 @@ def do_fit(args):
                     return -np.inf
                 i += 6
 
-            pred = (system.light_curve(lc.time, texp=lc.texp) - 1) * 1e3
+            mod = dilution * system.light_curve(lc.time, texp=lc.texp)
+            mod += 1.0 - dilution
+            pred = (mod - 1) * 1e3
             r = lc.flux - pred
             bg = lc.predict(r)
 
@@ -204,7 +214,10 @@ def do_fit(args):
                 t0 = planet.t0
 
                 t = np.linspace(-1, 1, 500)
-                pred = (system.light_curve(t + t0, texp=lc.texp) - 1) * 1e3
+                mod = dilution * system.light_curve(t + t0, texp=lc.texp)
+                mod += 1.0 - dilution
+
+                pred = (mod - 1) * 1e3
                 pl.plot(t, pred, "k", lw=0.5)
                 c = (lc.time - lc.time.min()) / (lc.time.max() - lc.time.min())
                 pl.scatter((lc.time-t0+0.5*p) % p-0.5*p, lc.flux-bg, c=c, s=6,
@@ -258,6 +271,7 @@ def do_fit(args):
         pl.close(fig)
 
     print("Production...")
+    # ensemble = sampler.run(ensemble, 50)
     ensemble = sampler.run(ensemble, 50000 * (len(candidates) + 1))
 
     # Deal with first run.
@@ -332,8 +346,9 @@ if __name__ == "__main__":
 
     # Loop over candidates.
     candidates = pd.read_csv(args.candidate_file)
-    # for id_ in ["EPIC 201367065"]:
-    for id_, _ in candidates.groupby("kicid"):
+    # for id_, _ in candidates.groupby("kicid"):
+    # for id_ in ["EPIC 201257461"]:
+    for id_ in ["EPIC 201828749"]:
         epicid = id_.split()[1]
 
         # Get the stellar parameters.
