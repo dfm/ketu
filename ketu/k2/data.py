@@ -9,6 +9,7 @@ import h5py
 import fitsio
 import numpy as np
 from scipy.linalg import cho_solve, cho_factor
+from scipy.ndimage.filters import gaussian_filter
 
 from ..pipeline import Pipeline
 from .epic import Catalog
@@ -19,7 +20,7 @@ class Data(Pipeline):
     query_parameters = {
         "light_curve_file": (None, True),
         "catalog_file": (None, True),
-        "initial_time": (1975., False)
+        "initial_time": (1975., False),
     }
 
     def get_result(self, query, parent_response):
@@ -102,51 +103,82 @@ class K2LightCurve(object):
         self.flux = np.ascontiguousarray(self.flux[m2], dtype=np.float64)
         self.ferr = np.ascontiguousarray(self.ferr[m2], dtype=np.float64)
         self.basis = np.ascontiguousarray(self.basis[:, m2], dtype=np.float64)
-        self.update_matrices()
+
+        # Set up the GP kernel.
+        tau = 0.25 * estimate_tau(self.time, self.flux)
+        print(tau)
+        K = np.var(self.flux) * kernel(tau, self.time)
+        self.base_K = np.array(K)
+        K[np.diag_indices_from(K)] += self.ferr ** 2
+        self.base_factor = cho_factor(K)
+
+        # Pre-compute K-inverse using the matrix inversion lemma.
+        Kf = cho_factor(K)
+        KiB = cho_solve(Kf, self.basis.T)
+        self.Kinv = cho_solve(Kf, np.eye(len(K)), overwrite_b=True)
+        self.Kinv -= np.dot(KiB, np.linalg.solve(np.dot(self.basis, KiB),
+                                                 KiB.T))
+        self.alpha = np.dot(self.Kinv, self.flux)
 
         # Pre-compute the base likelihood.
         self.ll0 = self.lnlike()
 
-    def update_matrices(self):
-        n = self.basis.shape[0] + 1
-        self.ATA = np.empty((n, n), dtype=np.float64)
-        self.ATA[1:, 1:] = np.dot(self.basis, self.basis.T)
-        self.ATA[np.diag_indices_from(self.ATA)] += 1e-10
-        self._factor = cho_factor(self.ATA[1:, 1:])
-
-        self.scaled = np.empty(n, dtype=np.float64)
-        self.scaled[1:] = np.dot(self.basis, self.flux)
-
     def lnlike(self, model=None):
         if model is None:
-            return -0.5 * np.sum((self.predict() - self.flux)**2) * self.ivar
+            return -0.5 * np.dot(self.flux, self.alpha)
 
         # Evaluate the transit model.
         m = model(self.time)
         if m[0] != 0.0 or m[-1] != 0.0 or np.all(m == 0.0):
             return 0.0, 0.0, 0.0
 
-        # Update the matrices.
-        v = np.dot(self.basis, m)
-        self.ATA[0, 1:] = v
-        self.ATA[1:, 0] = v
-        self.ATA[0, 0] = np.dot(m, m)
-        self.scaled[0] = np.dot(m, self.flux)
-
-        # This is the depth inverse variance.
-        s = self.ivar / np.linalg.inv(self.ATA)[0, 0]
-
-        # And the linear weights (depth is the first).
-        factor = cho_factor(self.ATA, overwrite_a=False)
-        w = cho_solve(factor, self.scaled, overwrite_b=False)
-
-        # Compute the lnlikelihood.
-        mu = np.dot(w[1:], self.basis) + w[0] * m
-        ll = -0.5 * np.sum((self.flux - mu)**2) * self.ivar
-        return ll - self.ll0, w[0], s
+        mKi = np.dot(m, self.Kinv)
+        ivar = np.dot(mKi, m)
+        depth = np.dot(mKi, self.flux) / ivar
+        r = self.flux - m*depth
+        ll = -0.5 * np.dot(r, np.dot(self.Kinv, r))
+        return ll - self.ll0, depth, ivar
 
     def predict(self, y=None):
         if y is None:
             y = self.flux
-        w = cho_solve(self._factor, np.dot(self.basis, y), overwrite_b=True)
+        mu_lin = self.predict_linear(y)
+        mu_gp = self.predict_gp(y - mu_lin)
+        return mu_gp + mu_lin
+
+    def predict_gp(self, y):
+        return np.dot(self.base_K, cho_solve(self.base_factor, y))
+
+    def predict_linear(self, y):
+        ATA = np.dot(self.basis, cho_solve(self.base_factor, self.basis.T))
+        alpha = cho_solve(self.base_factor, y)
+        w = np.linalg.solve(ATA, np.dot(self.basis, alpha))
         return np.dot(w, self.basis)
+
+
+def acor_fn(x):
+    """Compute the autocorrelation function of a time series."""
+    n = len(x)
+    f = np.fft.fft(x-np.mean(x), n=2*n)
+    acf = np.fft.ifft(f * np.conjugate(f))[:n].real
+    return acf / acf[0]
+
+
+def estimate_tau(t, y):
+    """Estimate the correlation length of a time series."""
+    dt = np.min(np.diff(t))
+    tt = np.arange(t.min(), t.max(), dt)
+    yy = np.interp(tt, t, y, 1)
+    f = acor_fn(yy)
+    fs = gaussian_filter(f, 50)
+    w = dt * np.arange(len(f))
+    m = np.arange(1, len(fs)-1)[(fs[1:-1] > fs[2:]) & (fs[1:-1] > fs[:-2])]
+    if len(m):
+        return w[m[np.argmax(fs[m])]]
+    return w[-1]
+
+
+def kernel(tau, t):
+    """Matern-3/2 kernel function"""
+    r = np.sqrt(3 * ((t[:, None] - t[None, :]) / tau) ** 2)
+    return (1 + r) * np.exp(-r)
