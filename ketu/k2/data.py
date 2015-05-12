@@ -120,7 +120,7 @@ class K2LightCurve(object):
 
     def build_kernels(self):
         # FIXME
-        self.K_b = np.dot(self.basis.T, self.basis * 1e4)
+        self.K_b = np.dot(self.basis.T, self.basis)
         tau = 0.25 * estimate_tau(self.time, self.flux)
         print("tau = {0}".format(tau))
         self.K_t = np.var(self.flux) * kernel(tau, self.time)
