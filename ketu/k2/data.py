@@ -76,20 +76,24 @@ class K2LightCurve(object):
         self.basis = np.concatenate((basis[:, self.m],
                                      np.ones((1, self.m.sum()))))
 
+        # Build the initial kernel matrix.
+        self.build_kernels()
+
         # Do a few rounds of sigma clipping.
         m1 = np.ones_like(self.flux, dtype=bool)
         m2 = np.zeros_like(self.flux, dtype=bool)
+        nums = np.arange(len(self.flux))
         count = m1.sum()
         for i in range(max_iter):
-            # Predict using the "good" points.
-            b = self.basis[:, m1]
-            w = np.linalg.solve(np.dot(b, b.T), np.dot(b, self.flux[m1]))
-            mu = np.dot(w, self.basis)
+            inds = (nums[m1, None], nums[None, m1])
+            alpha = np.linalg.solve(self.K[inds], self.flux[m1])
+            mu = np.dot(self.K_0[:, m1], alpha)
 
             # Mask the bad points.
-            std = np.sqrt(np.median((self.flux - mu) ** 2))
-            m1 = np.abs(self.flux - mu) < sigma_clip * std
-            m2 = self.flux - mu > sigma_clip * std
+            r = self.flux - mu
+            std = np.sqrt(np.median(r ** 2))
+            m1 = np.abs(r) < sigma_clip * std
+            m2 = r > sigma_clip * std
 
             print(m1.sum(), count)
             if m1.sum() == count:
@@ -104,24 +108,25 @@ class K2LightCurve(object):
         self.ferr = np.ascontiguousarray(self.ferr[m2], dtype=np.float64)
         self.basis = np.ascontiguousarray(self.basis[:, m2], dtype=np.float64)
 
-        # Set up the GP kernel.
-        tau = 0.25 * estimate_tau(self.time, self.flux)
-        print(tau)
-        K = np.var(self.flux) * kernel(tau, self.time)
-        self.base_K = np.array(K)
-        K[np.diag_indices_from(K)] += self.ferr ** 2
-        self.base_factor = cho_factor(K)
+        # Build the final GP kernel.
+        self.build_kernels()
 
-        # Pre-compute K-inverse using the matrix inversion lemma.
-        Kf = cho_factor(K)
-        KiB = cho_solve(Kf, self.basis.T)
-        self.Kinv = cho_solve(Kf, np.eye(len(K)), overwrite_b=True)
-        self.Kinv -= np.dot(KiB, np.linalg.solve(np.dot(self.basis, KiB),
-                                                 KiB.T))
-        self.alpha = np.dot(self.Kinv, self.flux)
+        # Precompute some factors.
+        self.factor = cho_factor(self.K)
+        self.alpha = cho_solve(self.factor, self.flux)
 
         # Pre-compute the base likelihood.
         self.ll0 = self.lnlike()
+
+    def build_kernels(self):
+        # FIXME
+        self.K_b = np.dot(self.basis.T, self.basis * 1e4)
+        tau = 0.25 * estimate_tau(self.time, self.flux)
+        print("tau = {0}".format(tau))
+        self.K_t = np.var(self.flux) * kernel(tau, self.time)
+        self.K_0 = self.K_b + self.K_t
+        self.K = np.array(self.K_0)
+        self.K[np.diag_indices_from(self.K)] += self.ferr**2
 
     def lnlike(self, model=None):
         if model is None:
@@ -132,28 +137,24 @@ class K2LightCurve(object):
         if m[0] != 0.0 or m[-1] != 0.0 or np.all(m == 0.0):
             return 0.0, 0.0, 0.0
 
-        mKi = np.dot(m, self.Kinv)
-        ivar = np.dot(mKi, m)
-        depth = np.dot(mKi, self.flux) / ivar
+        Km = cho_solve(self.factor, m)
+        Ky = cho_solve(self.factor, self.flux)
+        ivar = np.dot(m, Km)
+        depth = np.dot(m, Ky) / ivar
         r = self.flux - m*depth
-        ll = -0.5 * np.dot(r, np.dot(self.Kinv, r))
+        ll = -0.5 * np.dot(r, Ky - depth * Km)
         return ll - self.ll0, depth, ivar
 
     def predict(self, y=None):
         if y is None:
             y = self.flux
-        mu_lin = self.predict_linear(y)
-        mu_gp = self.predict_gp(y - mu_lin)
-        return mu_gp + mu_lin
+        return np.dot(self.K_0, cho_solve(self.factor, y))
 
-    def predict_gp(self, y):
-        return np.dot(self.base_K, cho_solve(self.base_factor, y))
+    def predict_t(self, y):
+        return np.dot(self.K_t, cho_solve(self.factor, y))
 
-    def predict_linear(self, y):
-        ATA = np.dot(self.basis, cho_solve(self.base_factor, self.basis.T))
-        alpha = cho_solve(self.base_factor, y)
-        w = np.linalg.solve(ATA, np.dot(self.basis, alpha))
-        return np.dot(w, self.basis)
+    def predict_b(self, y):
+        return np.dot(self.K_b, cho_solve(self.factor, y))
 
 
 def acor_fn(x):
