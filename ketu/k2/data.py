@@ -61,7 +61,8 @@ class K2LightCurve(object):
         self.time = np.ascontiguousarray(self.time[self.m], dtype=np.float64)
         self.flux = np.ascontiguousarray(self.flux[self.m], dtype=np.float64)
 
-    def prepare(self, basis_file, nbasis=150, sigma_clip=7.0, max_iter=10):
+    def prepare(self, basis_file, nbasis=150, sigma_clip=7.0, max_iter=10,
+                tau_frac=0.25):
         # Normalize the data.
         self.flux = self.flux / np.median(self.flux) - 1.0
         self.flux *= 1e3  # Convert to ppt.
@@ -77,6 +78,7 @@ class K2LightCurve(object):
                                      np.ones((1, self.m.sum()))))
 
         # Build the initial kernel matrix.
+        self.tau_frac = tau_frac
         self.build_kernels()
 
         # Do a few rounds of sigma clipping.
@@ -119,9 +121,8 @@ class K2LightCurve(object):
         self.ll0 = self.lnlike()
 
     def build_kernels(self):
-        # FIXME
         self.K_b = np.dot(self.basis.T, self.basis)
-        tau = 0.25 * estimate_tau(self.time, self.flux)
+        tau = self.tau_frac * estimate_tau(self.time, self.flux)
         print("tau = {0}".format(tau))
         self.K_t = np.var(self.flux) * kernel(tau, self.time)
         self.K_0 = self.K_b + self.K_t
