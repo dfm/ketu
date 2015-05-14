@@ -36,7 +36,7 @@ class Pipeline(object):
             if parent is None:
                 from . import __version__
                 basepath = os.path.join(os.path.abspath(os.path.expanduser(
-                    os.environ.get("TURNSTILE_PATH", "~/.turnstile"))),
+                    os.environ.get("KETU_PATH", "~/ketu"))),
                     __version__)
             else:
                 basepath = parent.basepath
