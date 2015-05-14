@@ -140,7 +140,7 @@ class K2LightCurve(object):
             return 0.0, 0.0, 0.0
 
         Km = cho_solve(self.factor, m)
-        Ky = cho_solve(self.factor, self.flux)
+        Ky = self.alpha
         ivar = np.dot(m, Km)
         depth = np.dot(m, Ky) / ivar
         r = self.flux - m*depth
