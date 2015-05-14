@@ -33,6 +33,7 @@ class Data(Pipeline):
 
         return dict(
             epic=star,
+            starid=int(star.epic_number),
             target_light_curves=[K2LightCurve(fn,
                                               time0=query["initial_time"])],
         )
