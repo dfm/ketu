@@ -6,6 +6,7 @@ __all__ = ["Data"]
 
 import os
 import h5py
+import copy
 import fitsio
 import numpy as np
 from scipy.linalg import cho_solve, cho_factor
@@ -34,14 +35,14 @@ class Data(Pipeline):
         return dict(
             epic=star,
             starid=int(star.epic_number),
-            target_light_curves=[K2LightCurve(fn,
-                                              time0=query["initial_time"])],
+            target_light_curves=K2LightCurve(fn,
+                                             query["initial_time"]).split(),
         )
 
 
 class K2LightCurve(object):
 
-    def __init__(self, fn, time0=1975.):
+    def __init__(self, fn, time0, tol=10):
         data, hdr = fitsio.read(fn, header=True)
         aps = fitsio.read(fn, 2)
 
@@ -56,14 +57,39 @@ class K2LightCurve(object):
         self.time = data["time"] - time0
         self.flux = data["flux"][:, i]
         q = data["quality"]
+        q = ((q == 0) | (q & 16384).astype(bool))
+        self.m = np.isfinite(self.time) * np.isfinite(self.flux) & q
 
-        # Drop the bad data.
-        self.m = np.isfinite(self.time) * np.isfinite(self.flux) * (q == 0)
-        self.time = np.ascontiguousarray(self.time[self.m], dtype=np.float64)
-        self.flux = np.ascontiguousarray(self.flux[self.m], dtype=np.float64)
+    def split(self, tol=10):
+        # Loop over the time array and break it into "chunks" when there is "a
+        # sufficiently long gap" with no data.
+        count, current, chunks = 0, [], []
+        for i, t in enumerate(self.time):
+            if np.isnan(t):
+                count += 1
+            else:
+                if count > tol:
+                    chunks.append(list(current))
+                    current = []
+                    count = 0
+                current.append(i)
+        if len(current):
+            chunks.append(current)
+
+        # Build a list of copies.
+        lcs = []
+        for chunk in chunks:
+            lc = copy.deepcopy(self)
+            lc.m = np.zeros(len(self.time), dtype=bool)
+            lc.m[chunk] = self.m[chunk]
+            lc.time = np.ascontiguousarray(lc.time[lc.m], dtype=np.float64)
+            lc.flux = np.ascontiguousarray(lc.flux[lc.m], dtype=np.float64)
+            lcs.append(lc)
+        return lcs
 
     def prepare(self, basis_file, nbasis=150, sigma_clip=7.0, max_iter=10,
                 tau_frac=0.25):
+
         # Normalize the data.
         self.flux = self.flux / np.median(self.flux) - 1.0
         self.flux *= 1e3  # Convert to ppt.
