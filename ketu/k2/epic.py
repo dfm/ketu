@@ -2,7 +2,7 @@
 
 from __future__ import division, print_function
 
-__all__ = ["download"]
+__all__ = ["Catalog"]
 
 import os
 import requests

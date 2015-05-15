@@ -54,8 +54,6 @@ def search(bp):
         # Save the output.
         bp = q["results_path"]
         pipe.save_to_cache(os.path.join(bp, "features.h5"), r)
-        pipe.parent.save_to_cache(os.path.join(bp, "peaks.h5"),
-                                  r.parent_response)
 
     except:
         with open(os.path.join(bp, "error.log"), "a") as f:
@@ -70,8 +68,8 @@ def search(bp):
         gc.collect()
 
 
-def generate_system(K, min_period=3., max_period=80.,
-                    min_ror=0.02, max_ror=0.2):
+def generate_system(K, min_period=1., max_period=70.,
+                    min_ror=0.01, max_ror=0.2):
     labels = ["period", "t0", "radius", "b", "e", "pomega", "q1", "q2"]
 
     periods = np.exp(np.random.uniform(np.log(min_period), np.log(max_period),
@@ -95,10 +93,11 @@ if __name__ == "__main__":
 
     parser.add_argument("file_glob", help="pattern for the LC files")
     parser.add_argument("basis_file", help="the archive of PCA comps")
+    parser.add_argument("catalog_file", help="the EPIC catalog file")
     parser.add_argument("base_dir", help="the directory for output")
-    parser.add_argument("--ninj", type=int, default=0,
+    parser.add_argument("--ninj", type=int, default=2,
                         help="number of injections")
-    parser.add_argument("--min-period", type=float, default=0.5,
+    parser.add_argument("--min-period", type=float, default=1.0,
                         help="minimum period")
     parser.add_argument("--max-period", type=float, default=70.0,
                         help="maximum period")
@@ -114,12 +113,11 @@ if __name__ == "__main__":
 
     query = dict(
         basis_file=os.path.abspath(args.basis_file),
-        time_spacing=0.02,
-        dt=0.02,
+        catalog_file=os.path.abspath(args.catalog_file),
         durations=[0.05, 0.1, 0.2],
         min_period=args.min_period,
         max_period=args.max_period,
-        nbasis=150,
+        nbasis=500,
     )
 
     # Initialize the pool.
@@ -140,15 +138,13 @@ if __name__ == "__main__":
                 epicid = os.path.split(fn)[-1].split("-")[0][4:]
                 outdir = os.path.abspath(os.path.join(args.base_dir, epicid,
                                                       "{0:04d}".format(i)))
-                if os.path.exists(os.path.join(outdir, "results",
-                                               "features.h5")):
+                if os.path.exists(os.path.join(outdir, "features.h5")):
                     print("skipping {0}/{1:04d}".format(epicid, i))
                     continue
 
                 # Update the query.
-                query["kicid"] = "EPIC {0}".format(epicid)
                 query["light_curve_file"] = os.path.abspath(fn)
-                query["results_path"] = os.path.join(outdir, "results")
+                query["results_path"] = os.path.join(outdir)
                 if i:
                     k = np.argmax(np.random.multinomial(1, multi)) + 1
                     q = dict(query, **(generate_system(

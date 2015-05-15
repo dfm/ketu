@@ -189,8 +189,7 @@ class FeatureExtract(Pipeline):
             pass
 
         with h5py.File(fn, "w") as f:
-            f.create_dataset("features", data=response["features"],
-                             compression="gzip")
+            f.create_dataset("features", data=response["features"])
 
     def load_from_cache(self, fn):
         if os.path.exists(fn):

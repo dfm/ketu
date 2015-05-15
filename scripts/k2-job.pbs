@@ -1,8 +1,8 @@
 #!/bin/bash
-#PBS -l nodes=2:ppn=20
+#PBS -l nodes=3:ppn=20
 #PBS -l walltime=24:00:00
 #PBS -l mem=350GB
-#PBS -N k2
+#PBS -N ketu
 #PBS -m ae
 #PBS -M danfm@nyu.edu
 #PBS -j oe
@@ -12,8 +12,8 @@ export PATH="$HOME/anaconda/bin:$PATH"
 module load mvapich2/intel/2.0rc1
 
 # Locations.
-export SRCDIR=$HOME/projects/k2-turnstile
-export RUNDIR=$WORK/k2/results
+export SRCDIR=$HOME/projects/ketu
+export RUNDIR=$SCRATCH/ketu/search/results_1
 export PROFILEDIR=$RUNDIR/profile
 mkdir -p $RUNDIR
 cd $RUNDIR
@@ -37,7 +37,9 @@ done
 
 if (( success )); then
     # Run the analysis.
-    python $SRCDIR/scripts/k2_search.py "$WORK/k2/data/lightcurves/c1/*/*/*.fits" $WORK/k2/data/lightcurves/c1-basis.h5 $RUNDIR --profile-dir $PROFILEDIR &> output.log
+    python $SRCDIR/scripts/ketu-search "$SCRATCH/ketu/data/lightcurves/c1/*/*/*.fits" \
+        $SCRATCH/ketu/data/elcs/c1-norm.h5 $SCRATCH/ketu/data/catalogs/epic.h5 \
+        $RUNDIR --profile-dir $PROFILEDIR &> output.log
 else
     echo "Server never started" &> output.log
 fi
