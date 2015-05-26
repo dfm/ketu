@@ -13,7 +13,7 @@ module load mvapich2/intel/2.0rc1
 
 # Locations.
 export SRCDIR=$HOME/projects/ketu
-export RUNDIR=$SCRATCH/ketu/search/results_1
+export RUNDIR=$SCRATCH/ketu/search/results_2
 export PROFILEDIR=$RUNDIR/profile
 mkdir -p $RUNDIR
 cd $RUNDIR

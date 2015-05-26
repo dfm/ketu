@@ -46,20 +46,24 @@ if __name__ == "__main__":
     for ind, d in enumerate(fns):
         if (ind + 1) % 500 == 0:
             print(100 * (ind + 1) / len(fns))
+            break
 
         # Skip if any of the required files don't exist.
         feat_fn = os.path.join(d, "results", "features.h5")
         q_fn = os.path.join(d, "query.json")
         if not os.path.exists(feat_fn) or not os.path.exists(q_fn):
-            # print("Skipping {0}".format(d))
+            print("Skipping {0}".format(d))
             continue
 
-        # Get the KIC ID.
-        with open(q_fn, "r") as f:
-            data = json.load(f)
-            kicid = data["kicid"]
+        # # Get the KIC ID.
+        # with open(q_fn, "r") as f:
+        #     data = json.load(f)
+        #     kicid = data["kicid"]
 
         with h5py.File(feat_fn, "r") as f:
+            print(pd.DataFrame.from_records(f["features"]))
+            assert 0
+
             # Get any injection information.
             inj_rec = f["inj_rec"][...]
             if len(inj_rec):
