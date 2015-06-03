@@ -25,7 +25,10 @@ if __name__ == "__main__":
         if (ind + 1) % 500 == 0:
             print(100 * (ind + 1) / len(fns))
 
-        df = pd.read_hdf(feat_fn, "features")
+        try:
+            df = pd.read_hdf(feat_fn, "features")
+        except KeyError:
+            continue
         df["meta_hasinj"] = np.any(df.meta_isexact)
         df["meta_filename"] = feat_fn
         if features is None:
