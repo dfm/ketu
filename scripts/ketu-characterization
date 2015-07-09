@@ -66,10 +66,17 @@ def do_fit(args):
     p0, orig_samples = None, None
     if os.path.exists(outfn):
         with h5py.File(outfn, "r") as f:
-            orig_samples = f["chain"][:, :, :]
-            orig_lnprior = f["lnprior"][:, :]
-            orig_lnprob = f["lnprob"][:, :]
-            p0 = orig_samples[-1, :, :]
+            w = np.argmax(f["lnprob"][-1, :])
+            c = f["chain"][-1, w, :]
+            nw = f["chain"].shape[1]
+
+            # orig_samples = f["chain"][:, :, :]
+            # orig_lnprior = f["lnprior"][:, :]
+            # orig_lnprob = f["lnprob"][:, :]
+            # w = np.argmax(orig_lnprob[])
+            # p0 = orig_samples[-1, :, :]
+
+        p0 = c + 1e-8 * np.random.randn(nw, len(c))
 
     # Dilution. HACK HACK HACK HACK
     if epicid == "201828749":
@@ -95,25 +102,32 @@ def do_fit(args):
         basis_file=os.path.abspath(basis_file),
         light_curve_file=os.path.abspath(light_curve_file),
         catalog_file=os.path.abspath(catalog_file),
+        use_gp=False,
+        # lam=1000.0
     )
-    r = pipe.query(**query)
+    resp = pipe.query(**query)
 
     # Load the data and plot it.
-    lc = r.model_light_curves[0]
-    pl.plot(lc.time, lc.flux, ".k")
-    pl.xlim(lc.time.min(), lc.time.max())
+    for lc in resp.model_light_curves:
+        pl.plot(lc.time, lc.flux, ".k")
+    # pl.xlim(lc.time.min(), lc.time.max())
     pl.xlabel("time")
     pl.savefig(os.path.join(outdir, "data.png"))
     pl.close()
 
     # Set up the initial system model.
-    star = transit.Central()
+    print(mean)
+    star = transit.Central(radius=mean[0], mass=mean[1])
     system = transit.System(star)
     for _, row in candidates.iterrows():
         system.add_body(transit.Body(r=np.sqrt(row.depth*1e-3)*mean[0],
-                                     period=row.period, t0=row.t0))
+                                     period=row.period, t0=row.t0,
+                                     b=0.5))
     with open(os.path.join(outdir, "model.pkl"), "wb") as f:
         pickle.dump(system, f, -1)
+
+    initial_periods = np.array(candidates.period)
+    initial_t0s = np.array(candidates.t0)
 
     # Define the probabilistic model.
     class TransitWalker(emcee.BaseWalker):
@@ -129,12 +143,16 @@ def do_fit(args):
                 return -np.inf
 
             i = 5
-            for body in system.bodies:
+            for n, body in enumerate(system.bodies):
                 lnr, lnp, t0, b, sesn, secs = p[i:i+6]
+                if np.abs(np.exp(lnp) - initial_periods[n]) > 1.0:
+                    return -np.inf
+                if np.abs(t0 - initial_t0s[n]) > 2.0:
+                    return -np.inf
                 if not 0 <= b < 2.0:
                     return -np.inf
                 e = sesn**2 + secs**2
-                if not 0 <= e < 1.0:
+                if not 0 <= e < 0.9:
                     return -np.inf
                 i += 6
 
@@ -169,13 +187,20 @@ def do_fit(args):
                     return -np.inf
                 i += 6
 
-            mod = dilution * system.light_curve(lc.time, texp=lc.texp)
-            mod += 1.0 - dilution
-            pred = (mod - 1) * 1e3
-            r = lc.flux - pred
-            r -= lc.predict(r)
+            ll = 0.0
+            for lc in resp.model_light_curves:
+                try:
+                    mod = dilution * system.light_curve(lc.time, texp=lc.texp)
+                except RuntimeError:
+                    return -np.inf
+                mod += 1.0 - dilution
+                pred = (mod - 1) * 1e3
+                r = lc.flux - pred
+                ll += lc.lnlike_eval(r)
+                # r -= lc.predict(r)
+                # ll += np.sum(r ** 2) * lc.ivar
 
-            return -0.5 * np.sum(r ** 2) * lc.ivar
+            return ll
 
         def plot(self, p):
             # Update the stellar parameters.
@@ -198,31 +223,35 @@ def do_fit(args):
                 try:
                     planet.b = b
                 except ValueError:
-                    return -np.inf
+                    return None
                 i += 6
 
-            mod = dilution * system.light_curve(lc.time, texp=lc.texp)
-            mod += 1.0 - dilution
-            pred = (mod - 1) * 1e3
-            r = lc.flux - pred
-            bg = lc.predict(r)
+            fig, axes = pl.subplots(len(system.bodies), 1,
+                                    figsize=(6, 3*len(system.bodies)))
+            axes = np.atleast_1d(axes)
 
-            fig = pl.figure(figsize=(6, 3*len(system.bodies)))
-            for i, planet in enumerate(system.bodies):
-                pl.subplot(len(system.bodies), 1, i+1)
-                p = planet.period
-                t0 = planet.t0
-
-                t = np.linspace(-1, 1, 500)
-                mod = dilution * system.light_curve(t + t0, texp=lc.texp)
+            for lc in resp.model_light_curves:
+                mod = dilution * system.light_curve(lc.time, texp=lc.texp)
                 mod += 1.0 - dilution
-
                 pred = (mod - 1) * 1e3
-                pl.plot(t, pred, "k", lw=0.5)
-                c = (lc.time - lc.time.min()) / (lc.time.max() - lc.time.min())
-                pl.scatter((lc.time-t0+0.5*p) % p-0.5*p, lc.flux-bg, c=c, s=6,
-                           edgecolor="none")
-                pl.xlim(-1, 1)
+                r = lc.flux - pred
+                bg = lc.predict(r)
+
+                for i, planet in enumerate(system.bodies):
+                    p = planet.period
+                    t0 = planet.t0
+
+                    t = np.linspace(-1, 1, 500)
+                    mod = dilution * system.light_curve(t + t0, texp=lc.texp)
+                    mod += 1.0 - dilution
+
+                    pred = (mod - 1) * 1e3
+                    axes[i].plot(t, pred, "k", lw=0.5)
+                    c = (lc.time - lc.time.min()) / (lc.time.max()
+                                                     - lc.time.min())
+                    axes[i].scatter((lc.time-t0+0.5*p) % p-0.5*p, lc.flux-bg,
+                                    c=c, s=6, edgecolor="none")
+                    axes[i].set_xlim(-1, 1)
 
             return fig
 
@@ -230,7 +259,7 @@ def do_fit(args):
     if p0 is None:
         p0 = list(np.log(mean)) + [0.5, 0.5]
         for planet in system.bodies:
-            p0 += [np.log(planet.r), np.log(planet.period), planet.t0, 0.1,
+            p0 += [np.log(planet.r), np.log(planet.period), planet.t0, 0.5,
                    0, 0]
         p0 = np.array(p0)
 
@@ -249,7 +278,7 @@ def do_fit(args):
 
         for i in range(2 * (len(candidates) + 1)):
             print("Burn-in {0}...".format(i+1))
-            ensemble = sampler.run(ensemble, 2000)
+            ensemble = sampler.run(ensemble, 1000)
 
             # Plot the middle model.
             samples = sampler.get_coords(flat=True)
@@ -270,9 +299,19 @@ def do_fit(args):
         fig.savefig(os.path.join(outdir, "restart.png"))
         pl.close(fig)
 
+        ensemble = sampler.run(ensemble, 1000)
+
+        # Plot the middle model.
+        samples = sampler.get_coords(flat=True)
+        lp = sampler.get_lnprob(flat=True)
+        best_p = samples[np.argmax(lp)]
+        fig = TransitWalker().plot(best_p)
+        fig.savefig(os.path.join(outdir, "restart2.png"))
+        pl.close(fig)
+
     print("Production...")
     # ensemble = sampler.run(ensemble, 50)
-    ensemble = sampler.run(ensemble, 50000 * (len(candidates) + 1))
+    ensemble = sampler.run(ensemble, 10000 * (len(candidates) + 1))
 
     # Deal with first run.
     if orig_samples is None:
@@ -346,9 +385,10 @@ if __name__ == "__main__":
 
     # Loop over candidates.
     candidates = pd.read_csv(args.candidate_file)
-    # for id_, _ in candidates.groupby("kicid"):
     # for id_ in ["EPIC 201257461"]:
-    for id_ in ["EPIC 201828749"]:
+    # for id_ in ["EPIC 201828749"]:
+    # for id_, _ in candidates.groupby("kicid"):
+    for id_ in ["EPIC 201649426"]:
         epicid = id_.split()[1]
 
         # Get the stellar parameters.

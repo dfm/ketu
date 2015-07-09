@@ -22,6 +22,7 @@ class Data(Pipeline):
         "light_curve_file": (None, True),
         "catalog_file": (None, True),
         "initial_time": (1975., False),
+        "use_gp": (True, False),
     }
 
     def get_result(self, query, parent_response):
@@ -36,13 +37,16 @@ class Data(Pipeline):
             epic=star,
             starid=int(star.epic_number),
             target_light_curves=K2LightCurve(fn,
-                                             query["initial_time"]).split(),
+                                             query["initial_time"],
+                                             gp=query["use_gp"]).split(),
         )
 
 
 class K2LightCurve(object):
 
-    def __init__(self, fn, time0, tol=10):
+    def __init__(self, fn, time0, tol=10, gp=True):
+        self.gp = gp
+
         data, hdr = fitsio.read(fn, header=True)
         aps = fitsio.read(fn, 2)
 
@@ -88,7 +92,8 @@ class K2LightCurve(object):
         return lcs
 
     def prepare(self, basis_file, nbasis=150, sigma_clip=7.0, max_iter=10,
-                tau_frac=0.25):
+                tau_frac=0.25, lam=1.0):
+        self.lam = lam
 
         # Normalize the data.
         self.flux = self.flux / np.median(self.flux) - 1.0
@@ -148,13 +153,19 @@ class K2LightCurve(object):
         self.ll0 = self.lnlike()
 
     def build_kernels(self):
-        self.K_b = np.dot(self.basis.T, self.basis)
-        tau = self.tau_frac * estimate_tau(self.time, self.flux)
-        print("tau = {0}".format(tau))
-        self.K_t = np.var(self.flux) * kernel(tau, self.time)
-        self.K_0 = self.K_b + self.K_t
+        self.K_b = np.dot(self.basis.T, self.basis * self.lam)
+        if self.gp:
+            tau = self.tau_frac * estimate_tau(self.time, self.flux)
+            print("tau = {0}".format(tau))
+            self.K_t = np.var(self.flux) * kernel(tau, self.time)
+            self.K_0 = self.K_b + self.K_t
+        else:
+            self.K_0 = self.K_b
         self.K = np.array(self.K_0)
         self.K[np.diag_indices_from(self.K)] += self.ferr**2
+
+    def lnlike_eval(self, y):
+        return -0.5 * np.dot(y, cho_solve(self.factor, y))
 
     def lnlike(self, model=None):
         if model is None:
