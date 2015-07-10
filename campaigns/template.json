@@ -3,5 +3,7 @@
     "data_root": "/path/to/the/data",
     "catalog_file": "catalogs/epic.h5",
     "basis_file": "elcs/cn.h5",
-    "initial_time": 0.0
+    "initial_time": 0.0,
+    "nbasis": 500,
+    "output_dir": "/path/to/output"
 }

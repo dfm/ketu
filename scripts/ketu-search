@@ -68,7 +68,8 @@ def search(bp):
         gc.collect()
 
 
-def generate_system(K, min_period=1., max_period=70.,
+def generate_system(K,
+                    min_period=1., max_period=70.,
                     min_ror=0.01, max_ror=0.2):
     labels = ["period", "t0", "radius", "b", "e", "pomega", "q1", "q2"]
 
@@ -90,11 +91,7 @@ def generate_system(K, min_period=1., max_period=70.,
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-
-    parser.add_argument("file_glob", help="pattern for the LC files")
-    parser.add_argument("basis_file", help="the archive of PCA comps")
-    parser.add_argument("catalog_file", help="the EPIC catalog file")
-    parser.add_argument("base_dir", help="the directory for output")
+    parser.add_argument("spec", help="the JSON campaign spec")
     parser.add_argument("--ninj", type=int, default=3,
                         help="number of injections")
     parser.add_argument("--min-period", type=float, default=1.0,
@@ -103,7 +100,6 @@ if __name__ == "__main__":
                         help="maximum period")
     parser.add_argument("-p", "--profile-dir", default=None,
                         help="the IPython profile dir")
-
     args = parser.parse_args()
     print("Running with the following arguments:")
     print("sys.argv:")
@@ -111,13 +107,25 @@ if __name__ == "__main__":
     print("args:")
     print(args)
 
+    # Parse the spec.
+    spec = json.load(open(args.spec, "r"))
+    bp = os.path.join(spec["data_root"])
+    lcs = os.path.abspath(os.path.join(bp,
+                                       "lightcurves/c{0:.0f}/*/*/ktwo*.fits"
+                                       .format(spec["campaign"])))
+    basis_file = os.path.abspath(os.path.join(bp, spec["basis_file"]))
+    catalog_file = os.path.abspath(os.path.join(bp, spec["catalog_file"]))
+    nbasis = int(spec["nbasis"])
+    output_dir = os.path.abspath(spec["output_dir"])
+
+    # Build the base query.
     query = dict(
-        basis_file=os.path.abspath(args.basis_file),
-        catalog_file=os.path.abspath(args.catalog_file),
+        basis_file=basis_file,
+        catalog_file=catalog_file,
         durations=[0.05, 0.1, 0.2],
         min_period=args.min_period,
         max_period=args.max_period,
-        nbasis=500,
+        nbasis=nbasis,
     )
 
     # Initialize the pool.
@@ -130,13 +138,19 @@ if __name__ == "__main__":
     multi /= np.sum(multi)
 
     # Loop over the files.
-    fns = glob.glob(args.file_glob)
+    fns = glob.glob(lcs)
     bs = len(fns)
     for batch in range(0, len(fns), bs):
         for fn in fns[batch:batch+bs]:
             for i in range(args.ninj + 1):
                 epicid = os.path.split(fn)[-1].split("-")[0][4:]
-                outdir = os.path.abspath(os.path.join(args.base_dir, epicid,
+
+                # Skip the custom targets.
+                if int(epicid) < 201000000:
+                    continue
+
+                # Check if this run has been executed already.
+                outdir = os.path.abspath(os.path.join(output_dir, epicid,
                                                       "{0:04d}".format(i)))
                 if os.path.exists(os.path.join(outdir, "features.h5")):
                     print("skipping {0}/{1:04d}".format(epicid, i))
