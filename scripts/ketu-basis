@@ -15,6 +15,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     spec = json.load(open(args.spec, "r"))
     bp = os.path.join(spec["data_root"])
-    lcs = os.path.join(bp, spec["light_curve_pattern"])
+    lcs = os.path.join(bp, "lightcurves/c{0:.0f}/*/*/ktwo*.fits"
+                       .format(spec["campaign"]))
     outfile = os.path.join(bp, spec["basis_file"])
     build(lcs, outfile)

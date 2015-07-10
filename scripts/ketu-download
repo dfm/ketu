@@ -13,10 +13,7 @@ CMD = ("wget -q -nH --cut-dirs=2 -r -l0 -c -N -np -R 'index*' -erobots=off "
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("spec",
-                        help="the JSON campaign spec")
-    parser.add_argument("campaign", type=int,
-                        help="the campaign number")
+    parser.add_argument("spec", help="the JSON campaign spec")
     args = parser.parse_args()
 
     spec = json.load(open(args.spec, "r"))
@@ -25,7 +22,7 @@ if __name__ == "__main__":
         os.makedirs(bp)
     except os.error:
         pass
-    cmd = CMD.format(bp, args.campaign)
+    cmd = CMD.format(bp, int(spec["campaign"]))
     print("Running:")
     print(cmd)
     check_call(cmd, shell=True)

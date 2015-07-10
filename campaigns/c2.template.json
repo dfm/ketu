@@ -1,6 +1,6 @@
 {
+    "campaign": 2,
     "data_root": "/export/bbq2/dfm/k2/web",
-    "light_curve_pattern": "lightcurves/c2/*/*/ktwo*.fits",
     "catalog_file": "catalogs/epic.h5",
     "basis_file": "elcs/c2-norm.h5",
     "initial_time": 2100.0

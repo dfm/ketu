@@ -1,6 +1,6 @@
 {
+    "campaign": 1,
     "data_root": "/path/to/the/data",
-    "light_curve_pattern": "lightcurves/c1/*/*/ktwo*.fits",
     "catalog_file": "catalogs/epic.h5",
     "basis_file": "elcs/c1-norm.h5",
     "initial_time": 1975.0

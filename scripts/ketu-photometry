@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import division, print_function
+import os
+import json
 import glob
 from multiprocessing import Pool
 
@@ -22,15 +24,18 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("tpfs",
-                        help=("pattern for the TPF files. For example: "
-                              "'target_pixel_files/c1/*/*/*.fits.gz'"))
+    parser.add_argument("spec", help="the JSON campaign spec")
     parser.add_argument("-p", "--parallel", action="store_true",
                         help="should this be run in parallel?")
 
     args = parser.parse_args()
 
-    filenames = glob.glob(args.tpfs)
+    spec = json.load(open(args.spec, "r"))
+    bp = os.path.join(spec["data_root"])
+    tpfs = os.path.join(bp, "target_pixel_files/c{0:.0f}/*/*/ktwo*.fits.gz"
+                        .format(spec["campaign"]))
+
+    filenames = glob.glob(tpfs)
     if args.parallel:
         pool = Pool()
         pool.map(_wrap, filenames)
