@@ -2,18 +2,19 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import division, print_function
+
+import os
+import json
 from ketu.k2.basis import build
 
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(
-        description="Build the basis."
-    )
-    parser.add_argument("lcs",
-                        help=("pattern for the LC files. For example: "
-                              "'lightcurves/c1/*/*/*.fits'"))
-    parser.add_argument("outfile",
-                        help="path where the basis should be saved")
+    parser = argparse.ArgumentParser(description="build the ELC basis")
+    parser.add_argument("spec", help="the JSON campaign spec")
     args = parser.parse_args()
-    build(args.lcs, args.outfile)
+    spec = json.load(open(args.spec, "r"))
+    bp = os.path.join(spec["data_root"])
+    lcs = os.path.join(bp, spec["light_curve_pattern"])
+    outfile = os.path.join(bp, spec["basis_file"])
+    build(lcs, outfile)

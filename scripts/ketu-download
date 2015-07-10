@@ -3,6 +3,7 @@
 
 from __future__ import division, print_function
 import os
+import json
 from subprocess import check_call
 
 CMD = ("wget -q -nH --cut-dirs=2 -r -l0 -c -N -np -R 'index*' -erobots=off "
@@ -12,17 +13,19 @@ CMD = ("wget -q -nH --cut-dirs=2 -r -l0 -c -N -np -R 'index*' -erobots=off "
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
+    parser.add_argument("spec",
+                        help="the JSON campaign spec")
     parser.add_argument("campaign", type=int,
-                        help="the Campaign to download")
-    parser.add_argument("basepath",
-                        help="the basepath for the output")
+                        help="the campaign number")
     args = parser.parse_args()
 
+    spec = json.load(open(args.spec, "r"))
+    bp = os.path.join(spec["data_root"])
     try:
-        os.makedirs(args.basepath)
+        os.makedirs(bp)
     except os.error:
         pass
-    cmd = CMD.format(args.basepath, args.campaign)
+    cmd = CMD.format(bp, args.campaign)
     print("Running:")
     print(cmd)
     check_call(cmd, shell=True)
