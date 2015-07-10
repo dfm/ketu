@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -l nodes=3:ppn=20
+#PBS -l procs=60
 #PBS -l walltime=24:00:00
 #PBS -l mem=350GB
 #PBS -N ketu
@@ -11,9 +11,12 @@ module purge
 export PATH="$HOME/anaconda/bin:$PATH"
 module load mvapich2/intel/2.0rc1
 
+# Campaign.
+export K2C_NUM="c2"
+
 # Locations.
 export SRCDIR=$HOME/projects/ketu
-export RUNDIR=$SCRATCH/ketu/search/results_2
+export RUNDIR=$SCRATCH/ketu/search/$K2C_NUM
 export PROFILEDIR=$RUNDIR/profile
 mkdir -p $RUNDIR
 cd $RUNDIR
@@ -37,9 +40,8 @@ done
 
 if (( success )); then
     # Run the analysis.
-    python $SRCDIR/scripts/ketu-search "$SCRATCH/ketu/data/lightcurves/c1/*/*/*.fits" \
-        $SCRATCH/ketu/data/elcs/c1-norm.h5 $SCRATCH/ketu/data/catalogs/epic.h5 \
-        $RUNDIR --profile-dir $PROFILEDIR &> output.log
+    python $SRCDIR/scripts/ketu-search $SRCDIR/campaigns/c2.mercer.json \
+        --profile-dir $PROFILEDIR &> output.log
 else
     echo "Server never started" &> output.log
 fi
