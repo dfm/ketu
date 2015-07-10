@@ -1,0 +1,7 @@
+{
+    "data_root": "/path/to/the/data",
+    "light_curve_pattern": "lightcurves/cn/*/*/ktwo*.fits",
+    "catalog_file": "catalogs/epic.h5",
+    "basis_file": "elcs/cn.h5",
+    "initial_time": 1975.0
+}
