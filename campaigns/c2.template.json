@@ -5,5 +5,5 @@
     "basis_file": "elcs/c2-norm.h5",
     "initial_time": 2100.0,
     "nbasis": 500,
-    "output_dir": "/path/to/output"
+    "output_dir": "/export/bbq2/dfm/ketu-results"
 }

@@ -116,7 +116,9 @@ if __name__ == "__main__":
     basis_file = os.path.abspath(os.path.join(bp, spec["basis_file"]))
     catalog_file = os.path.abspath(os.path.join(bp, spec["catalog_file"]))
     nbasis = int(spec["nbasis"])
-    output_dir = os.path.abspath(spec["output_dir"])
+    output_dir = os.path.abspath(os.path.join(spec["output_dir"],
+                                              "c{0:.0f}"
+                                              .format(int(spec["campaign"]))))
 
     # Build the base query.
     query = dict(
@@ -126,6 +128,7 @@ if __name__ == "__main__":
         min_period=args.min_period,
         max_period=args.max_period,
         nbasis=nbasis,
+        initial_time=float(spec["initial_time"]),
     )
 
     # Initialize the pool.

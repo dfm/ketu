@@ -8,7 +8,6 @@ import os
 import h5py
 import copy
 import fitsio
-import logging
 import numpy as np
 from scipy.linalg import cho_solve, cho_factor
 from scipy.ndimage.filters import gaussian_filter
@@ -20,7 +19,6 @@ from .epic import Catalog
 class Data(Pipeline):
 
     query_parameters = {
-        "data_root": (None, True),
         "light_curve_file": (None, True),
         "catalog_file": (None, True),
         "initial_time": (None, True),
@@ -28,13 +26,11 @@ class Data(Pipeline):
     }
 
     def get_result(self, query, parent_response):
-        data_root = query["data_root"]
-
-        fn = os.path.join(data_root, query["light_curve_file"])
+        fn = query["light_curve_file"]
         epicid = os.path.split(fn)[-1].split("-")[0][4:]
 
         # Query the EPIC.
-        cat = Catalog(os.path.join(data_root, query["catalog_file"])).df
+        cat = Catalog(query["catalog_file"]).df
         _, star = cat[cat.epic_number == int(epicid)].iterrows().next()
 
         return dict(
