@@ -1,7 +1,7 @@
 #!/bin/bash
-#PBS -l procs=60
+#PBS -l nodes=2:ppn=20
 #PBS -l walltime=24:00:00
-#PBS -l mem=350GB
+#PBS -l mem=60GB
 #PBS -N ketu
 #PBS -m ae
 #PBS -M danfm@nyu.edu
@@ -16,7 +16,7 @@ export K2C_NUM="c2"
 
 # Locations.
 export SRCDIR=$HOME/projects/ketu
-export RUNDIR=$SCRATCH/ketu/search/$K2C_NUM
+export RUNDIR=$SCRATCH/ketu/results/$K2C_NUM
 export PROFILEDIR=$RUNDIR/profile
 mkdir -p $RUNDIR
 cd $RUNDIR
