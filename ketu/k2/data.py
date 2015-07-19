@@ -61,7 +61,7 @@ class K2LightCurve(object):
         self.time = data["time"] - time0
         self.flux = data["flux"][:, i]
         q = data["quality"]
-        q = ((q == 0) | (q & 16384).astype(bool))
+        q = ((q == 0) | (q == 16384).astype(bool))
         self.m = np.isfinite(self.time) * np.isfinite(self.flux) & q
 
     def split(self, tol=10):
