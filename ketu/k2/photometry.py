@@ -32,6 +32,11 @@ def run(fn, clobber=False):
     if "spd" in fn:
         return
 
+    # Skip custom targets.
+    epicid = os.path.split(fn)[-1].split("-")[0][4:]
+    if int(epicid) < 201000000:
+        return
+
     # Construct the output filename.
     pre, post = os.path.split(fn)
     a, b, _ = post.split("-")
@@ -46,6 +51,9 @@ def run(fn, clobber=False):
     with fits.open(fn) as hdus:
         data = hdus[1].data
         table = np.empty(len(data["TIME"]), dtype=dt)
+        t = data["TIME"]
+        m = np.isfinite(t)
+        print("Mean time: {0}".format(0.5*(t[m].min()+t[m].max())))
 
         # Initialize the new columns to NaN.
         for k in ["flux", "bkg"]:

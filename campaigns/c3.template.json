@@ -1,0 +1,9 @@
+{
+    "campaign": 2,
+    "data_root": "/export/bbq2/dfm/k2/web",
+    "catalog_file": "catalogs/epic.h5",
+    "basis_file": "elcs/c3-norm.h5",
+    "initial_time": 2179.0,
+    "nbasis": 500,
+    "output_dir": "/export/bbq2/dfm/ketu-results"
+}
