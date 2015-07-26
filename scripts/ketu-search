@@ -129,6 +129,7 @@ if __name__ == "__main__":
         max_period=args.max_period,
         nbasis=nbasis,
         initial_time=float(spec["initial_time"]),
+        skip=int(spec.get("skip", 0)),
     )
 
     # Initialize the pool.

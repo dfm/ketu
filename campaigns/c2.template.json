@@ -4,6 +4,7 @@
     "catalog_file": "catalogs/epic.h5",
     "basis_file": "elcs/c2-norm.h5",
     "initial_time": 2100.0,
+    "skip": 50,
     "nbasis": 500,
     "output_dir": "/export/bbq2/dfm/ketu-results"
 }
