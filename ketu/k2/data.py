@@ -60,12 +60,15 @@ class K2LightCurve(object):
         i = np.argmin(var)
 
         # Load the data.
-        skip = int(skip)
-        self.time = data["time"][skip:] - time0
-        self.flux = data["flux"][skip:, i]
-        q = data["quality"][skip:]
+        self.skip = int(skip)
+        self.time = data["time"] - time0
+        self.flux = data["flux"][:, i]
+        q = data["quality"]
         q = ((q == 0) | (q == 16384).astype(bool))
-        self.m = np.isfinite(self.time) * np.isfinite(self.flux) & q
+        self.m = (np.isfinite(self.time) &
+                  np.isfinite(self.flux) &
+                  (np.arange(len(self.time)) > int(skip)) &
+                  q)
 
     def split(self, tol=10):
         # Loop over the time array and break it into "chunks" when there is "a
