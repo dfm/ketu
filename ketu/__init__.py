@@ -11,7 +11,7 @@ if not __KETU_SETUP__:
     __all__ = [
         "Pipeline", "kepler", "k2",
         "OneDSearch", "TwoDSearch", "PeakDetect", "FeatureExtract",
-        "Validate", "IterativeTwoDSearch",
+        "Validate", "IterativeTwoDSearch", "Vetter",
     ]
 
     try:
@@ -30,3 +30,4 @@ if not __KETU_SETUP__:
     from .feature_extract import FeatureExtract
     from .dv import Validate
     from .iterative import IterativeTwoDSearch
+    from .vetter import Vetter
