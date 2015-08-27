@@ -13,30 +13,35 @@ from scipy.optimize import minimize
 from .pipeline import Pipeline
 
 
-def _get_system(p):
-    q1, q2 = p[:2]
-    period, ror, duration = np.exp(p[2:5])
-    t0, b = p[5:]
-    q1 = max(min(q1, 1.-1e-4), 1e-4)
-    q2 = max(min(q2, 1.-1e-4), 1e-4)
-    s = transit.SimpleSystem(
-        period=period, t0=t0, ror=ror, duration=duration, impact=b,
-        q1=q1, q2=q2)
-    return s
+def _nll_transit(p, system, lcs):
+    system.set_vector(p)
 
-
-def _nll_transit(p, lcs):
-    s = _get_system(p)
     ll = 0.0
     for lc in lcs:
-        mod = 1e3*(s.light_curve(lc.time, texp=lc.texp)-1.0)
-        r = lc.flux - mod
+        mod = 1e3*(system.light_curve(lc.time, texp=lc.texp)-1.0)
+        r = mod - lc.flux
         ll += lc.lnlike_eval(r)
     return -ll
 
 
+def _nll_and_grad_transit(p, system, lcs):
+    system.set_vector(p)
+
+    ll = 0.0
+    ll_grad = np.zeros_like(p)
+    for lc in lcs:
+        mod, grad = system.light_curve_gradient(lc.time, texp=lc.texp)
+        r = 1e3 * (mod - 1.0) - lc.flux
+        grad *= 1e3
+        a, b = lc.grad_lnlike_eval(r, grad)
+        ll += a
+        ll_grad += b
+    return -ll, ll_grad
+
+
 def _ln_evidence_basic(lcs):
-    return sum(lc.lnlike_eval(lc.flux) for lc in lcs)
+    ll = sum(lc.lnlike_eval(lc.flux) for lc in lcs)
+    return ll, ll
 
 
 def _ln_evidence_box(lcs, period, duration, t0):
@@ -48,26 +53,32 @@ def _ln_evidence_box(lcs, period, duration, t0):
         mod[np.fabs((t - t0 + hp) % period - hp) < hd] = -1.0
         return mod
 
-    ll = 0.0
-    for lc in lcs:
-        l0, d, ivar = lc.lnlike(model)
-        ll += l0 + lc.ll0 - 0.5*np.log(ivar)
-    return ll
+    lnlike = 0.0
+    depths = np.empty(len(lcs))
+    ivars = np.empty(len(lcs))
+    for i, lc in enumerate(lcs):
+        l0, depths[i], ivars[i] = lc.lnlike(model)
+        lnlike += l0 + lc.ll0
+
+    depth = np.sum(ivars * depths) / np.sum(ivars)
+    ivar = np.sum(ivars)
+    lnlike -= 0.5 * np.sum((depths - depth)**2 * ivars)
+    return lnlike, lnlike - 0.5 * np.log(ivar)
 
 
-def _ln_evidence_transit(lcs, p):
+def _ln_evidence_transit(p, *args):
     h = 1e-2
     x0 = np.array(p)
     lnhess = np.empty_like(x0)
-    f0 = _nll_transit(x0, lcs)
+    f0 = _nll_transit(x0, *args)
     for i in range(len(x0)):
         x0[i] += h
-        fp = _nll_transit(x0, lcs)
+        fp = _nll_transit(x0, *args)
         x0[i] -= 2*h
-        fm = _nll_transit(x0, lcs)
+        fm = _nll_transit(x0, *args)
         x0[i] += h
         lnhess[i] = np.log(np.abs(fp - 2*f0 + fm))
-    return -f0 + 0.5 * (2*len(x0)*np.log(h) - np.sum(lnhess))
+    return -f0, -f0 + 0.5 * (2*len(x0)*np.log(h) - np.sum(lnhess))
 
 
 class Vetter(Pipeline):
@@ -89,41 +100,39 @@ class Vetter(Pipeline):
         # Loop over the peaks and compute the evidence for each one.
         for peak in peaks:
             # Compute the evidence for the box model.
-            peak["lnZ_none"] = _ln_evidence_basic(lcs)
-            peak["lnZ_box"] = _ln_evidence_box(lcs,
-                                               peak["period"],
-                                               peak["duration"],
-                                               peak["t0"])
+            peak["lnlike_none"], peak["lnZ_none"] = _ln_evidence_basic(lcs)
+            peak["lnlike_box"], peak["lnZ_box"] = _ln_evidence_box(
+                lcs, peak["period"], peak["duration"], peak["t0"])
+
+            # Set up the Keplerian fit.
+            system = transit.SimpleSystem(
+                period=peak["period"], t0=peak["t0"],
+                ror=np.sqrt(1e-3*peak["depth"]),
+                duration=peak["duration"],
+            )
 
             # Fit the transit model.
-            p0 = np.concatenate(([0.5, 0.5],
-                                 np.log([peak["period"],
-                                         np.sqrt(1e-3*peak["depth"]),
-                                         peak["duration"]]),
-                                 [peak["t0"], 0.0]))
-            t0rng = peak["t0"]+float(query["t0_rng"])*np.array([-1, 1])
-            lnprng = np.log([peak["period"]-query["period_rng"],
-                             peak["period"]+query["period_rng"]])
-            result = minimize(_nll_transit, p0, method="L-BFGS-B", args=(lcs,),
-                              bounds=[(0+1e-4, 1-1e-4), (0+1e-4, 1-1e-4),
-                                      lnprng, (None, None),
-                                      (None, None), t0rng, (0, 1.5)])
+            p0 = system.get_vector()
+            result = minimize(_nll_and_grad_transit, p0, method="L-BFGS-B",
+                              jac=True,
+                              args=(system, lcs))
+            system.set_vector(result.x)
 
             # Compute the transit evidence.
             x = result.x
-            peak["transit_q1"] = x[0]
-            peak["transit_q2"] = x[1]
-            peak["transit_period"] = np.exp(x[2])
-            peak["transit_ror"] = np.exp(x[3])
-            peak["transit_duration"] = np.exp(x[4])
-            peak["transit_t0"] = x[5]
-            peak["transit_b"] = x[6]
-            peak["lnZ_transit"] = _ln_evidence_transit(lcs, x)
+            peak["transit_q1"] = system.q1
+            peak["transit_q2"] = system.q2
+            peak["transit_period"] = system.period
+            peak["transit_ror"] = system.ror
+            peak["transit_duration"] = system.duration
+            peak["transit_t0"] = system.t0
+            peak["transit_b"] = system.impact
+            peak["lnlike_transit"], peak["lnZ_transit"] = \
+                _ln_evidence_transit(x, system, lcs)
 
             # Subtract the best fit transit model.
-            s = _get_system(x)
             for lc in lcs:
-                mod = 1e3*(s.light_curve(lc.time, texp=lc.texp)-1.0)
+                mod = 1e3*(system.light_curve(lc.time, texp=lc.texp)-1.0)
                 lc.flux -= mod
 
         # Return the fluxes to their original values.

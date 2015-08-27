@@ -172,6 +172,10 @@ class K2LightCurve(object):
     def lnlike_eval(self, y):
         return -0.5 * np.dot(y, cho_solve(self.factor, y))
 
+    def grad_lnlike_eval(self, y, dy):
+        alpha = cho_solve(self.factor, y)
+        return -0.5 * np.dot(y, alpha), np.dot(alpha, dy)
+
     def lnlike(self, model=None):
         if model is None:
             return -0.5 * np.dot(self.flux, self.alpha)
