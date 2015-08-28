@@ -7,10 +7,10 @@ __all__ = ["IterativeTwoDSearch"]
 import os
 import h5py
 import numpy as np
-from scipy.ndimage.filters import gaussian_filter
 
 from .two_d_search import TwoDSearch
 from ._grid_search import grid_search
+
 
 class IterativeTwoDSearch(TwoDSearch):
 
@@ -66,10 +66,13 @@ class IterativeTwoDSearch(TwoDSearch):
             t0_2d = t0_2d[inds]
             depth_2d = depth_2d[inds]
             depth_ivar_2d = depth_ivar_2d[inds]
+            phic_same = phic_same[inds]
+            phic_variable = phic_variable[inds]
+            phic_same_2 = phic_same_2[inds]
 
             # Find the top peak.
             s2n = depth_2d * np.sqrt(depth_ivar_2d)
-            top_peak = np.argmax(s2n)
+            top_peak = np.argmax(phic_same)
             p, t0 = periods[top_peak], t0_2d[top_peak]
             duration = query["durations"][inds[1][top_peak]]
 
@@ -80,6 +83,9 @@ class IterativeTwoDSearch(TwoDSearch):
                 depth=depth_2d[top_peak],
                 depth_ivar=depth_ivar_2d[top_peak],
                 s2n=s2n[top_peak],
+                phic_same=phic_same[top_peak],
+                phic_same_second=phic_same_2[top_peak],
+                phic_variable=phic_variable[top_peak],
             ))
 
             # Mask out these transits.
@@ -88,7 +94,8 @@ class IterativeTwoDSearch(TwoDSearch):
             depth_1d[m] = 0.0
             depth_ivar_1d[m] = 0.0
             dll_1d[m] = 0.0
-            if np.sum(np.any(depth_ivar_1d>0.0, axis=1)) < query["min_points"]:
+            if (np.sum(np.any(depth_ivar_1d > 0.0, axis=1))
+                    < query["min_points"]):
                 break
 
         return dict(

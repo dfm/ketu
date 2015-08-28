@@ -182,7 +182,7 @@ class K2LightCurve(object):
 
         # Evaluate the transit model.
         m = model(self.time)
-        if m[0] != 0.0 or m[-1] != 0.0 or np.all(m == 0.0):
+        if np.all(m == 0.0):  # m[0] != 0.0 or m[-1] != 0.0 or
             return 0.0, 0.0, 0.0
 
         Km = cho_solve(self.factor, m)

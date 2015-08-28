@@ -2,7 +2,7 @@ from __future__ import division
 
 cimport cython
 from libc.stdlib cimport malloc, free
-from libc.math cimport ceil, round, log, INFINITY, sqrt
+from libc.math cimport ceil, round, log, INFINITY, sqrt, M_PI
 
 import numpy as np
 cimport numpy as np
@@ -10,6 +10,7 @@ cimport numpy as np
 DTYPE = np.float64
 ctypedef np.float64_t DTYPE_t
 
+cdef double ln2pi = log(2.0 * M_PI)
 
 @cython.boundscheck(False)
 cdef int evaluate_single(double alpha, double period, double t0,
@@ -26,6 +27,7 @@ cdef int evaluate_single(double alpha, double period, double t0,
     # Initialize the results array at zero.
     for k in range(nduration):
         phic_variable[k] = 0.0
+        phic_same[k] = 0.0
         depth_2d[k] = 0.0
         depth_ivar_2d[k] = 0.0
 
@@ -60,9 +62,12 @@ cdef int evaluate_single(double alpha, double period, double t0,
             # First incorporate the delta log-likelihood for this
             # transit time.
             phic_variable[k] += dll_1d[ind]
+            phic_same[k] += dll_1d[ind]
 
             # And then the uncertainty in the depth measurement.
-            phic_variable[k] += 0.5*log(depth_ivar_1d[ind])
+            # phic_variable[k] += 0.5 * (ln2pi - log(depth_ivar_1d[ind]))
+            phic_same[k] -= 0.5 * (ln2pi - log(depth_ivar_1d[ind]))
+            phic_same[k] -= 0.5 * depth_1d[ind] * depth_1d[ind] * depth_ivar_1d[ind]
 
             # Here, we'll accumulate the weighted depth
             # measurement for the single depth model.
@@ -71,9 +76,7 @@ cdef int evaluate_single(double alpha, double period, double t0,
 
         # Now, use the results of the previous computation to evaluate the
         # single depth PHIC.
-
-        # Penalize the PHICs for the number of free parameters.
-        phic_same[k] = phic_variable[k] - 0.5 * alpha
+        phic_same[k] -= 0.5 * alpha
         phic_variable[k] -= 0.5 * nind * alpha
 
         # If there was any measurement for the depth, update the
@@ -81,14 +84,8 @@ cdef int evaluate_single(double alpha, double period, double t0,
         if depth_ivar_2d[k] > 0 and nind >= 2:
             depth_2d[k] /= depth_ivar_2d[k]
 
-            # Loop over the saved list of transit times and evaluate
-            # the depth measurement at the maximum likelihood location.
-            for l in range(nind):
-                ind = inds[l]
-                if depth_ivar_1d[ind] <= 0.0:
-                    continue
-                d = depth_1d[ind] - depth_2d[k]
-                phic_same[k] -= 0.5 * d * d * depth_ivar_1d[ind]
+            phic_same[k] += 0.5 * depth_2d[k] * depth_2d[k] * depth_ivar_2d[k]
+            # phic_same[k] += 0.5 * (ln2pi - log(depth_ivar_2d[k]))
 
         else:
             depth_2d[k] = 0.0

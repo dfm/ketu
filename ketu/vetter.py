@@ -32,6 +32,11 @@ def _nll_and_grad_transit(p, system, lcs):
     for lc in lcs:
         mod, grad = system.light_curve_gradient(lc.time, texp=lc.texp)
         r = 1e3 * (mod - 1.0) - lc.flux
+        if np.any(~np.isfinite(r)):
+            print(p)
+            print(r)
+            print(system.q1, system.q2)
+            assert 0
         grad *= 1e3
         a, b = lc.grad_lnlike_eval(r, grad)
         ll += a
@@ -44,7 +49,7 @@ def _ln_evidence_basic(lcs):
     return ll, ll
 
 
-def _ln_evidence_box(lcs, period, duration, t0):
+def _ln_like_box(lcs, period, duration, t0):
     hp = 0.5 * period
     hd = 0.5 * duration
 
@@ -58,18 +63,32 @@ def _ln_evidence_box(lcs, period, duration, t0):
     ivars = np.empty(len(lcs))
     for i, lc in enumerate(lcs):
         l0, depths[i], ivars[i] = lc.lnlike(model)
-        lnlike += l0 + lc.ll0
+        if ivars[i] > 0.0:
+            lnlike += l0 + lc.ll0
+
+    m = ivars > 0.0
+    depths = depths[m]
+    ivars = ivars[m]
 
     depth = np.sum(ivars * depths) / np.sum(ivars)
     ivar = np.sum(ivars)
-    lnlike -= 0.5 * np.sum((depths - depth)**2 * ivars)
-    return lnlike, lnlike - 0.5 * np.log(ivar)
+
+    lnlike -= 0.5 * np.sum(depths**2 * ivars)
+    lnlike += 0.5 * depth**2 * ivar
+    lnlike += 0.5 * np.sum(np.log(ivars)) - 0.5*len(depths)*np.log(2*np.pi)
+
+    return lnlike, ivar
+
+
+def _ln_evidence_box(lcs, period, duration, t0):
+    lnlike, ivar = _ln_like_box(lcs, period, duration, t0)
+    return lnlike, lnlike - 0.5 * np.log(ivar) + 0.5 * np.log(2*np.pi)
 
 
 def _ln_evidence_transit(p, *args):
-    h = 1e-2
+    h = 1.1234e-3
     x0 = np.array(p)
-    lnhess = np.empty_like(x0)
+    lnd2fdx2 = np.empty_like(x0)
     f0 = _nll_transit(x0, *args)
     for i in range(len(x0)):
         x0[i] += h
@@ -77,8 +96,10 @@ def _ln_evidence_transit(p, *args):
         x0[i] -= 2*h
         fm = _nll_transit(x0, *args)
         x0[i] += h
-        lnhess[i] = np.log(np.abs(fp - 2*f0 + fm))
-    return -f0, -f0 + 0.5 * (2*len(x0)*np.log(h) - np.sum(lnhess))
+        lnd2fdx2[i] = np.log(np.abs(fp - 2*f0 + fm))
+    lnd2fdx2 -= 2*np.log(h)
+    lnZ = -f0 - 0.5 * np.sum(lnd2fdx2) + 0.5 * len(x0) * np.log(2*np.pi)
+    return -f0, lnZ
 
 
 class Vetter(Pipeline):
@@ -113,9 +134,21 @@ class Vetter(Pipeline):
 
             # Fit the transit model.
             p0 = system.get_vector()
+            ln_period_rng = np.log((
+                peak["period"] - query["period_rng"],
+                peak["period"] + query["period_rng"],
+            ))
+            t0_rng = (
+                peak["t0"] - query["t0_rng"],
+                peak["t0"] + query["t0_rng"],
+            )
+            bounds = [(None, None), ln_period_rng, t0_rng,
+                      (None, None), (None, None),
+                      (-10.0, 10.0), (-10.0, 10.0)]
             result = minimize(_nll_and_grad_transit, p0, method="L-BFGS-B",
                               jac=True,
-                              args=(system, lcs))
+                              args=(system, lcs),
+                              bounds=bounds)
             system.set_vector(result.x)
 
             # Compute the transit evidence.
