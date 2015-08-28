@@ -72,7 +72,7 @@ class IterativeTwoDSearch(TwoDSearch):
 
             # Find the top peak.
             s2n = depth_2d * np.sqrt(depth_ivar_2d)
-            top_peak = np.argmax(phic_same)
+            top_peak = np.argmax(s2n)
             p, t0 = periods[top_peak], t0_2d[top_peak]
             duration = query["durations"][inds[1][top_peak]]
 
