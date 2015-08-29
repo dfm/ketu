@@ -24,6 +24,7 @@ class Data(Pipeline):
         "initial_time": (None, True),
         "skip": (0, False),
         "use_gp": (True, False),
+        "invert": (False, False),
     }
 
     def get_result(self, query, parent_response):
@@ -37,16 +38,19 @@ class Data(Pipeline):
         return dict(
             epic=star,
             starid=int(star.epic_number),
-            target_light_curves=K2LightCurve(fn,
-                                             query["initial_time"],
-                                             gp=query["use_gp"],
-                                             skip=query["skip"]).split(),
+            target_light_curves=K2LightCurve(
+                fn,
+                query["initial_time"],
+                gp=query["use_gp"],
+                skip=query["skip"],
+                invert=query["invert"],
+            ).split(),
         )
 
 
 class K2LightCurve(object):
 
-    def __init__(self, fn, time0, gp=True, skip=0):
+    def __init__(self, fn, time0, gp=True, skip=0, invert=False):
         self.gp = gp
 
         data, hdr = fitsio.read(fn, header=True)
@@ -63,6 +67,9 @@ class K2LightCurve(object):
         self.skip = int(skip)
         self.time = data["time"] - time0
         self.flux = data["flux"][:, i]
+        if invert:
+            mu = np.median(self.flux[np.isfinite(self.flux)])
+            self.flux = 2 * mu - self.flux
         q = data["quality"]
         q = ((q == 0) | (q == 16384).astype(bool))
         self.m = (np.isfinite(self.time) &

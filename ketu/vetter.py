@@ -96,7 +96,11 @@ def _ln_evidence_transit(p, *args):
         x0[i] -= 2*h
         fm = _nll_transit(x0, *args)
         x0[i] += h
-        lnd2fdx2[i] = np.log(np.abs(fp - 2*f0 + fm))
+        d = fp - 2*f0 + fm
+        if d <= 0.0:
+            lnd2fdx2[i] = np.inf
+        else:
+            lnd2fdx2[i] = np.log(fp - 2*f0 + fm)
     lnd2fdx2 -= 2*np.log(h)
     lnZ = -f0 - 0.5 * np.sum(lnd2fdx2) + 0.5 * len(x0) * np.log(2*np.pi)
     return -f0, lnZ
@@ -130,6 +134,7 @@ class Vetter(Pipeline):
                 period=peak["period"], t0=peak["t0"],
                 ror=np.sqrt(1e-3*peak["depth"]),
                 duration=peak["duration"],
+                impact=0.5,
             )
 
             # Fit the transit model.
