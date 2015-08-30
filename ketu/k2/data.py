@@ -154,7 +154,24 @@ class K2LightCurve(object):
         self.ferr = np.ascontiguousarray(self.ferr[m2], dtype=np.float64)
         self.basis = np.ascontiguousarray(self.basis[:, m2], dtype=np.float64)
 
-        # Build the final GP kernel.
+        # Find outliers.
+        self.build_kernels()
+        mu = np.dot(self.K_0, np.linalg.solve(self.K, self.flux))
+        delta = np.diff(self.flux - mu)
+        absdel = np.abs(delta)
+        mad = np.median(absdel)
+        m = np.zeros(self.m.sum(), dtype=bool)
+        m[1:-1] = absdel[1:] > sigma_clip * mad
+        m[1:-1] &= absdel[:-1] > sigma_clip * mad
+        m[1:-1] &= np.sign(delta[1:]) != np.sign(delta[:-1])
+
+        # Remove the outliers and finalize the dataset.
+        m = ~m
+        self.m[self.m] = m
+        self.time = np.ascontiguousarray(self.time[m], dtype=np.float64)
+        self.flux = np.ascontiguousarray(self.flux[m], dtype=np.float64)
+        self.ferr = np.ascontiguousarray(self.ferr[m], dtype=np.float64)
+        self.basis = np.ascontiguousarray(self.basis[:, m], dtype=np.float64)
         self.build_kernels()
 
         # Precompute some factors.

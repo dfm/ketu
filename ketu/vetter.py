@@ -33,9 +33,6 @@ def _nll_and_grad_transit(p, system, lcs):
         mod, grad = system.light_curve_gradient(lc.time, texp=lc.texp)
         r = 1e3 * (mod - 1.0) - lc.flux
         if np.any(~np.isfinite(r)):
-            print(p)
-            print(r)
-            print(system.q1, system.q2)
             assert 0
         grad *= 1e3
         a, b = lc.grad_lnlike_eval(r, grad)
@@ -47,6 +44,33 @@ def _nll_and_grad_transit(p, system, lcs):
 def _ln_evidence_basic(lcs):
     ll = sum(lc.lnlike_eval(lc.flux) for lc in lcs)
     return ll, ll
+
+
+def _ln_evidence_outlier(lcs, period, duration, t0):
+    hp = 0.5 * period
+    hd = 0.5 * duration
+
+    lnlike = 0.0
+    norm = 0.0
+    depths = np.empty(len(lcs))
+    ivars = np.empty(len(lcs))
+    for i, lc in enumerate(lcs):
+        r = lc.flux - lc.predict()
+        m = np.fabs((lc.time - t0 + hp) % period - hp) < hd
+        tloc = lc.time[m][np.argmin(r[m])]
+
+        def model(t):
+            mod = np.zeros_like(t)
+            mod[t == tloc] = -1.0
+            return mod
+
+        l0, depths[i], ivars[i] = lc.lnlike(model)
+        lnlike += lc.ll0
+        if ivars[i] > 0.0:
+            lnlike += l0
+            norm += 0.5 * (np.log(2*np.pi) - np.log(ivars[i]))
+
+    return lnlike, lnlike + norm
 
 
 def _ln_like_box(lcs, period, duration, t0):
@@ -63,8 +87,9 @@ def _ln_like_box(lcs, period, duration, t0):
     ivars = np.empty(len(lcs))
     for i, lc in enumerate(lcs):
         l0, depths[i], ivars[i] = lc.lnlike(model)
+        lnlike += lc.ll0
         if ivars[i] > 0.0:
-            lnlike += l0 + lc.ll0
+            lnlike += l0
 
     m = ivars > 0.0
     depths = depths[m]
@@ -127,6 +152,8 @@ class Vetter(Pipeline):
             # Compute the evidence for the box model.
             peak["lnlike_none"], peak["lnZ_none"] = _ln_evidence_basic(lcs)
             peak["lnlike_box"], peak["lnZ_box"] = _ln_evidence_box(
+                lcs, peak["period"], peak["duration"], peak["t0"])
+            peak["lnlike_outlier"], peak["lnZ_outlier"] = _ln_evidence_outlier(
                 lcs, peak["period"], peak["duration"], peak["t0"])
 
             # Set up the Keplerian fit.
