@@ -92,8 +92,10 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("spec", help="the JSON campaign spec")
-    parser.add_argument("--ninj", type=int, default=1,
+    parser.add_argument("--ninj", type=int, default=0,
                         help="number of injections")
+    parser.add_argument("--noinvert", action="store_true",
+                        help="invert the light curves too")
     parser.add_argument("--min-period", type=float, default=1.0,
                         help="minimum period")
     parser.add_argument("--max-period", type=float, default=50.0,
@@ -146,7 +148,7 @@ if __name__ == "__main__":
     bs = len(fns)
     for batch in range(0, len(fns), bs):
         for fn in fns[batch:batch+bs]:
-            for i in range(args.ninj + 1):
+            for i in range(args.ninj + int(~args.noinvert) + 2):
                 epicid = os.path.split(fn)[-1].split("-")[0][4:]
 
                 # Skip the custom targets.
