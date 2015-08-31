@@ -12,7 +12,7 @@ export PATH="$HOME/anaconda/bin:$PATH"
 module load mvapich2/intel/2.0rc1
 
 # Campaign.
-export K2C_NUM="c2"
+export K2C_NUM="c1"
 
 # Locations.
 export SRCDIR=$HOME/projects/ketu
@@ -40,7 +40,7 @@ done
 
 if (( success )); then
     # Run the analysis.
-    python $SRCDIR/scripts/ketu-search $SRCDIR/campaigns/c2.mercer.json \
+    python $SRCDIR/scripts/ketu-search $SRCDIR/campaigns/$K2C_NUM.mercer.json \
         --profile-dir $PROFILEDIR &> output.log
 else
     echo "Server never started" &> output.log

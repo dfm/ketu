@@ -92,11 +92,11 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("spec", help="the JSON campaign spec")
-    parser.add_argument("--ninj", type=int, default=3,
+    parser.add_argument("--ninj", type=int, default=1,
                         help="number of injections")
     parser.add_argument("--min-period", type=float, default=1.0,
                         help="minimum period")
-    parser.add_argument("--max-period", type=float, default=70.0,
+    parser.add_argument("--max-period", type=float, default=50.0,
                         help="maximum period")
     parser.add_argument("-p", "--profile-dir", default=None,
                         help="the IPython profile dir")
@@ -181,6 +181,7 @@ if __name__ == "__main__":
                 pipe = ketu.k2.Likelihood(pipe, cache=False)
                 pipe = ketu.OneDSearch(pipe, cache=False)
                 pipe = ketu.IterativeTwoDSearch(pipe, cache=False)
+                pipe = ketu.Vetter(pipe, cache=False)
                 pipe = ketu.FeatureExtract(pipe, cache=False)
 
                 # Save the files.
