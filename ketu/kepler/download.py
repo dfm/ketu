@@ -6,14 +6,21 @@ __all__ = ["Download", "PreparedDownload"]
 
 import os
 import sys
-import kplr
 import shutil
 import cPickle as pickle
+
+try:
+    import kplr
+except ImportError:
+    kplr = None
 
 from ..pipeline import Pipeline
 
 
 def prepare_download(query, fetch=True):
+    if kplr is None:
+        raise ImportError("kplr")
+
     # Connect to the API.
     client = kplr.API(data_root=query["data_root"])
     kicid = query["kicid"]
