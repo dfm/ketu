@@ -33,6 +33,7 @@ class FeatureExtract(Pipeline):
         # Add in the meta data columns.
         dtype += [
             ("meta_starid", int), ("meta_hasinj", bool), ("meta_isrec", bool),
+            ("meta_inverted", bool),
             ("inj_period", float), ("inj_t0", float), ("inj_radius", float),
             ("inj_b", float), ("inj_e", float), ("inj_pomega", float),
         ]
@@ -48,6 +49,7 @@ class FeatureExtract(Pipeline):
         features = np.empty(len(peaks), dtype=dtype)
         for i, peak in enumerate(peaks):
             features[i]["meta_starid"] = parent_response.starid
+            features[i]["meta_inverted"] = query.get("invert", False)
 
             # Peak data.
             for k, v in peak.items():
