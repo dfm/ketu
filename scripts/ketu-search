@@ -173,10 +173,13 @@ if __name__ == "__main__":
                 else:
                     q = dict(query)
 
+                # Invert the light curve.
+                q["invert"] = (i % 2) == 1
+
                 # Build the pipeline first.
                 pipe = ketu.k2.Data(cache=False,
                                     basepath=os.path.join(outdir, "cache"))
-                if i:
+                if i >= 2:
                     pipe = ketu.k2.Inject(pipe, cache=False)
                 pipe = ketu.k2.Likelihood(pipe, cache=False)
                 pipe = ketu.OneDSearch(pipe, cache=False)
