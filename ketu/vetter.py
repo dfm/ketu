@@ -57,6 +57,9 @@ def _ln_evidence_outlier(lcs, period, duration, t0):
     for i, lc in enumerate(lcs):
         r = lc.flux - lc.predict()
         m = np.fabs((lc.time - t0 + hp) % period - hp) < hd
+        if not np.any(m):
+            lnlike += lc.ll0
+            continue
         tloc = lc.time[m][np.argmin(r[m])]
 
         def model(t):
