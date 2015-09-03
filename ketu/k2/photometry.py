@@ -6,6 +6,7 @@ __all__ = ["run"]
 
 import os
 import numpy as np
+from scipy.ndimage.measurements import label
 
 try:
     from astropy.io import fits
@@ -14,14 +15,6 @@ except ImportError:
     fits = None
 
 from ..cdpp import compute_cdpp
-
-apertures = np.arange(0.5, 5.5, 0.5)
-dt = np.dtype([("cadenceno", np.int32), ("time", np.float32),
-               ("timecorr", np.float32), ("pos_corr1", np.float32),
-               ("pos_corr2", np.float32), ("quality", np.int32),
-               ("flux", (np.float32, len(apertures))),
-               ("bkg", (np.float32, len(apertures)))])
-dt2 = np.dtype([("radius", np.float32), ("cdpp6", np.float32)])
 
 
 def run(fn, clobber=False):
@@ -47,89 +40,112 @@ def run(fn, clobber=False):
     if os.path.exists(outfn) and not clobber:
         return
 
-    # Read the data.
+    print("{0} -> {1} ; {2}".format(fn, outfn))
     with fits.open(fn) as hdus:
         data = hdus[1].data
-        table = np.empty(len(data["TIME"]), dtype=dt)
         t = data["TIME"]
-        m = np.isfinite(t)
-        print("Mean time: {0}".format(0.5*(t[m].min()+t[m].max())))
-
-        # Initialize the new columns to NaN.
-        for k in ["flux", "bkg"]:
-            table[k] = np.nan
-
-        # Copy across the old columns.
-        for k in ["cadenceno", "time", "timecorr", "pos_corr1", "pos_corr2",
-                  "quality"]:
-            table[k] = data[k.upper()]
+        # m = np.isfinite(t)
+        # print("Midtime: {0}".format(0.5*(t[m].min()+t[m].max())))
+        q = data["QUALITY"] == 0
 
         # Use the WCS to find the center of the star.
         hdr = hdus[2].header
         wcs = WCS(hdr)
         cy, cx = wcs.wcs_world2pix(hdr["RA_OBJ"], hdr["DEC_OBJ"], 0.0)
 
-        # Choose the set of apertures.
-        aps = []
-        shape = data["FLUX"][0].shape
-        xi, yi = np.meshgrid(range(shape[0]), range(shape[1]), indexing="ij")
-        for r in apertures:
-            r2 = r*r
-            aps.append((xi - cx) ** 2 + (yi - cy) ** 2 < r2)
+        # Compute the summed image.
+        sum_img = np.zeros(data["FLUX"][0].shape)
+        for img in data["FLUX"][q]:
+            m = np.isfinite(img)
+            if not np.any(m):
+                continue
+            sum_img[m] += img[m]
+        sum_img[~np.isfinite(sum_img)] = 0.0
 
-        # Loop over the frames and do the aperture photometry.
+        # Compute some stats on the image.
+        x = sum_img[np.isfinite(sum_img) & (sum_img > 0.0)].flatten()
+        mu = np.median(x)
+        std = np.median(np.abs(x - mu))
+
+        # Find the shape that overlaps the WCS coordinates.
+        shape = data["FLUX"][0].shape
+        x_grid, y_grid = np.meshgrid(range(shape[0]), range(shape[1]),
+                                     indexing="ij")
+        r2 = (x_grid - cx) ** 2 + (y_grid - cy) ** 2
+        xi, yi = np.unravel_index(np.argmin(r2), shape)
+
+        # Loop over thresholds and compute the apertures.
+        params = []
+        flx_aps = []
+        bkg_aps = []
+        for thresh in np.arange(5, 50, 5):
+            sum_img[sum_img < mu + thresh*std] = 0.0
+            labels, _ = label(sum_img)
+            bkg = labels == 0
+            flx = labels == labels[xi, yi]
+            if labels[xi, yi] != 0 and np.any(bkg) and np.any(flx):
+                bkg_aps.append(bkg)
+                flx_aps.append(flx)
+                params.append(-thresh)
+
+        # Loop over radii and compute circular apertures.
+        for rad in np.arange(1, 15, 0.5):
+            bkg = r2 >= rad * rad
+            flx = r2 < rad * rad
+            if np.any(bkg) and np.any(flx):
+                bkg_aps.append(bkg)
+                flx_aps.append(flx)
+                params.append(rad)
+
+        # Loop over the images and do the photometry.
+        background = np.nan + np.zeros((len(data), len(params)))
+        flux = np.nan + np.zeros((len(data), len(params)))
         for i, img in enumerate(data["FLUX"]):
             fm = np.isfinite(img)
             fm[fm] = img[fm] > 0.0
-            if not np.any(fm):
-                continue
-            for j, mask in enumerate(aps):
-                # Choose the pixels in and out of the aperture.
-                m = mask * fm
-                bgm = (~mask) * fm
-
-                # Skip if there are no good pixels in the aperture.
-                if not np.any(m):
+            for j, (bkg_ap, flx_ap) in enumerate(zip(bkg_aps, flx_aps)):
+                if (not np.any(fm)) or (not np.any(fm & flx_ap)):
                     continue
+                background[i, j] = np.median(img[fm])
+                flux[i, j] = np.mean(img[fm & flx_ap] - background[i, j])
+        m = np.any(np.isfinite(flux) & np.isfinite(background), axis=0)
+        background = background[:, m]
+        flux = flux[:, m]
 
-                # Estimate the background and flux.
-                if np.any(bgm):
-                    bkg = np.median(img[bgm])
-                else:
-                    bkg = np.median(img[mask])
-                table["flux"][i, j] = np.sum(img[m] - bkg)
-                table["bkg"][i, j] = bkg
-
-        # Compute the number of good times.
-        nt = int(np.sum(np.any(np.isfinite(table["flux"]), axis=1)))
-        print("{0} -> {1} ; {2}".format(fn, outfn, nt))
-
-        # Skip it if there aren't *any* good times.
-        if nt == 0:
-            return
-
-        # Save the aperture information and precision.
-        ap_info = np.empty(len(apertures), dtype=dt2)
-        for i, r in enumerate(apertures):
-            ap_info[i]["radius"] = r
-
-            # Compute the precision.
-            t, f = table["time"], table["flux"][:, i]
-            ap_info[i]["cdpp6"] = compute_cdpp(t, f, 6.)
-
-        try:
-            os.makedirs(os.path.split(outfn)[0])
-        except os.error:
-            pass
-        hdr = hdus[1].header
-        hdr["CEN_X"] = float(cx)
-        hdr["CEN_Y"] = float(cy)
-        hdus_out = fits.HDUList([
-            fits.PrimaryHDU(header=hdr),
-            fits.BinTableHDU.from_columns(table, header=hdr),
-            fits.BinTableHDU.from_columns(ap_info),
+        # Build the dataset and save the light curve file.
+        dt = np.dtype([
+            ("cadenceno", np.int32), ("time", np.float32),
+            ("timecorr", np.float32), ("quality", np.int32),
+            ("flux", (np.float32, flux.shape[1])),
+            ("bkg", (np.float32, background.shape[1]))
         ])
+        table = np.empty(len(data), dtype=dt)
+        for k in ["cadenceno", "time", "timecorr", "quality"]:
+            table[k] = data[k.upper()]
+        table["flux"] = flux
+        table["bkg"] = background
 
-        hdus_out.writeto(outfn, clobber=True)
-        hdus_out.close()
-        del hdus_out
+    # Save the information and precision for each aperture.
+    ap_info = np.empty(len(params), dtype=[("parameter", np.float32),
+                                           ("cdpp6", np.float32)])
+    for i, p in enumerate(params):
+        ap_info[i]["parameter"] = p
+        ap_info[i]["cdpp6"] = compute_cdpp(t[q], flux[q, i], 6., robust=True)
+
+    # Save the file.
+    try:
+        os.makedirs(os.path.split(outfn)[0])
+    except os.error:
+        pass
+    hdr = hdus[1].header
+    hdr["CEN_X"] = float(cx)
+    hdr["CEN_Y"] = float(cy)
+    hdus_out = fits.HDUList([
+        fits.PrimaryHDU(header=hdr),
+        fits.BinTableHDU.from_columns(table, header=hdr),
+        fits.BinTableHDU.from_columns(ap_info),
+    ])
+
+    hdus_out.writeto(outfn, clobber=True)
+    hdus_out.close()
+    del hdus_out
