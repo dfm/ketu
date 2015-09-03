@@ -76,15 +76,13 @@ def _ln_evidence_outlier(lcs, period, duration, t0):
     return lnlike, lnlike + norm
 
 
-def _ln_like_box(lcs, period, duration, t0):
-    hp = 0.5 * period
-    hd = 0.5 * duration
-
-    def model(t):
+def _ln_evidence_box(lcs, period, duration, t0):
+    def model(t, hp=0.5*period, hd=0.5*duration):
         mod = np.zeros_like(t)
         mod[np.fabs((t - t0 + hp) % period - hp) < hd] = -1.0
         return mod
 
+    # Compute the evidence.
     lnlike = 0.0
     depths = np.empty(len(lcs))
     ivars = np.empty(len(lcs))
@@ -105,11 +103,38 @@ def _ln_like_box(lcs, period, duration, t0):
     lnlike += 0.5 * depth**2 * ivar
     lnlike += 0.5 * np.sum(np.log(ivars)) - 0.5*len(depths)*np.log(2*np.pi)
 
-    return lnlike, ivar
+    return lnlike, lnlike - 0.5 * np.log(ivar) + 0.5 * np.log(2*np.pi)
 
 
-def _ln_evidence_box(lcs, period, duration, t0):
-    lnlike, ivar = _ln_like_box(lcs, period, duration, t0)
+def _ln_evidence_vee(lcs, period, duration, t0):
+    def model(t, hp=0.5*period, hd=0.5*duration):
+        mod = np.zeros_like(t)
+        dt = (t - t0 + hp) % period - hp
+        m = np.fabs(dt) < hd
+        mod[m] = np.abs(dt[m]) / hd - 1.0
+        return mod
+
+    # Compute the evidence.
+    lnlike = 0.0
+    depths = np.empty(len(lcs))
+    ivars = np.empty(len(lcs))
+    for i, lc in enumerate(lcs):
+        l0, depths[i], ivars[i] = lc.lnlike(model)
+        lnlike += lc.ll0
+        if ivars[i] > 0.0:
+            lnlike += l0
+
+    m = ivars > 0.0
+    depths = depths[m]
+    ivars = ivars[m]
+
+    depth = np.sum(ivars * depths) / np.sum(ivars)
+    ivar = np.sum(ivars)
+
+    lnlike -= 0.5 * np.sum(depths**2 * ivars)
+    lnlike += 0.5 * depth**2 * ivar
+    lnlike += 0.5 * np.sum(np.log(ivars)) - 0.5*len(depths)*np.log(2*np.pi)
+
     return lnlike, lnlike - 0.5 * np.log(ivar) + 0.5 * np.log(2*np.pi)
 
 
@@ -152,13 +177,6 @@ class Vetter(Pipeline):
 
         # Loop over the peaks and compute the evidence for each one.
         for peak in peaks:
-            # Compute the evidence for the box model.
-            peak["lnlike_none"], peak["lnZ_none"] = _ln_evidence_basic(lcs)
-            peak["lnlike_box"], peak["lnZ_box"] = _ln_evidence_box(
-                lcs, peak["period"], peak["duration"], peak["t0"])
-            peak["lnlike_outlier"], peak["lnZ_outlier"] = _ln_evidence_outlier(
-                lcs, peak["period"], peak["duration"], peak["t0"])
-
             # Set up the Keplerian fit.
             system = transit.SimpleSystem(
                 period=peak["period"], t0=peak["t0"],
@@ -197,6 +215,18 @@ class Vetter(Pipeline):
             peak["transit_b"] = system.impact
             peak["lnlike_transit"], peak["lnZ_transit"] = \
                 _ln_evidence_transit(x, system, lcs)
+
+            # Compute the evidence for the competing models.
+            peak["lnlike_none"], peak["lnZ_none"] = _ln_evidence_basic(lcs)
+            peak["lnlike_box"], peak["lnZ_box"] = _ln_evidence_box(
+                lcs, peak["transit_period"], peak["transit_duration"],
+                peak["transit_t0"])
+            peak["lnlike_vee"], peak["lnZ_vee"] = _ln_evidence_vee(
+                lcs, peak["transit_period"], peak["transit_duration"],
+                peak["transit_t0"])
+            peak["lnlike_outlier"], peak["lnZ_outlier"] = _ln_evidence_outlier(
+                lcs, peak["transit_period"], peak["transit_duration"],
+                peak["transit_t0"])
 
             # Subtract the best fit transit model.
             for lc in lcs:
