@@ -126,11 +126,16 @@ def run(fn, clobber=False):
         table["bkg"] = background
 
     # Save the information and precision for each aperture.
-    ap_info = np.empty(len(params), dtype=[("parameter", np.float32),
-                                           ("cdpp6", np.float32)])
+    dt = np.dtype([
+        ("parameter", np.float32), ("cdpp6", np.float32),
+        ("raw_cdpp6", np.float32), ("corr_cdpp6", np.float32),
+    ])
+    ap_info = np.empty(len(params), dtype=dt)
     for i, p in enumerate(params):
         ap_info[i]["parameter"] = p
         ap_info[i]["cdpp6"] = compute_cdpp(t[q], flux[q, i], 6., robust=True)
+        ap_info[i]["raw_cdpp6"] = np.nan
+        ap_info[i]["corr_cdpp6"] = np.nan
 
     # Save the file.
     try:
