@@ -40,13 +40,13 @@ def run(fn, clobber=False):
     if os.path.exists(outfn) and not clobber:
         return
 
-    print("{0} -> {1} ; {2}".format(fn, outfn))
     with fits.open(fn) as hdus:
         data = hdus[1].data
         t = data["TIME"]
-        # m = np.isfinite(t)
-        # print("Midtime: {0}".format(0.5*(t[m].min()+t[m].max())))
         q = data["QUALITY"] == 0
+
+        m = np.isfinite(t)
+        print("{0} -> {1}; {2}".format(fn, outfn, 0.5*(t[m].min()+t[m].max())))
 
         # Use the WCS to find the center of the star.
         hdr = hdus[2].header
@@ -89,7 +89,7 @@ def run(fn, clobber=False):
                 params.append(-thresh)
 
         # Loop over radii and compute circular apertures.
-        for rad in np.arange(1, 15, 0.5):
+        for rad in np.arange(2, 15, 0.5):
             bkg = r2 >= rad * rad
             flx = r2 < rad * rad
             if np.any(bkg) and np.any(flx):

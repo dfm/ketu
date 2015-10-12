@@ -18,4 +18,4 @@ if __name__ == "__main__":
     lcs = os.path.join(bp, "lightcurves/c{0:.0f}/*/*/ktwo*.fits"
                        .format(spec["campaign"]))
     outfile = os.path.join(bp, spec["basis_file"])
-    build(lcs, outfile)
+    build(lcs, outfile, nbasis=spec.get("nbasis", 500))

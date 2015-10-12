@@ -5,14 +5,15 @@ from __future__ import division, print_function
 import os
 import json
 import glob
+from functools import partial
 from multiprocessing import Pool
 
 from ketu.k2.photometry import run
 
 
-def _wrap(fn):
+def _wrap(fn, **kwargs):
     try:
-        run(fn)
+        run(fn, **kwargs)
     except:
         print("failure: {0}".format(fn))
         import traceback
@@ -27,6 +28,8 @@ if __name__ == "__main__":
     parser.add_argument("spec", help="the JSON campaign spec")
     parser.add_argument("-p", "--parallel", action="store_true",
                         help="should this be run in parallel?")
+    parser.add_argument("-c", "--clobber", action="store_true",
+                        help="clobber existing files")
 
     args = parser.parse_args()
 
@@ -38,6 +41,6 @@ if __name__ == "__main__":
     filenames = glob.glob(tpfs)
     if args.parallel:
         pool = Pool()
-        pool.map(_wrap, filenames)
+        pool.map(partial(_wrap, clobber=args.clobber), filenames)
     else:
-        map(run, filenames)
+        map(partial(run, clobber=args.clobber), filenames)
