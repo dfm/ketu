@@ -7,7 +7,10 @@ __all__ = ["Catalog"]
 import os
 import requests
 import pandas as pd
-from StringIO import StringIO
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
 
 
 class Catalog(object):

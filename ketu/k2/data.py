@@ -33,7 +33,7 @@ class Data(Pipeline):
 
         # Query the EPIC.
         cat = Catalog(query["catalog_file"]).df
-        _, star = cat[cat.epic_number == int(epicid)].iterrows().next()
+        _, star = next(cat[cat.epic_number == int(epicid)].iterrows())
 
         return dict(
             epic=star,

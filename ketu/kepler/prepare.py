@@ -5,7 +5,10 @@ from __future__ import division, print_function, unicode_literals
 __all__ = ["Prepare"]
 
 import numpy as np
-from itertools import izip
+try:
+    from itertools import izip
+except ImportError:
+    izip = zip
 
 from ..pipeline import Pipeline
 

@@ -9,7 +9,10 @@ import gzip
 import json
 import time
 import hashlib
-import cPickle as pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 
 
 class Pipeline(object):
@@ -29,7 +32,7 @@ class Pipeline(object):
         if self.element_name is None:
             self.element_name = self.__class__.__name__
 
-        for k, v in kwargs.iteritems():
+        for k, v in kwargs.items():
             self.query_parameter[k] = (v, False)
 
         if basepath is None:
@@ -64,7 +67,7 @@ class Pipeline(object):
 
     def get_key(self, **kwargs):
         q = {}
-        for k, (default, req) in self.query_parameters.iteritems():
+        for k, (default, req) in self.query_parameters.items():
             if k in kwargs:
                 q[k] = kwargs[k]
             elif req:
@@ -75,8 +78,8 @@ class Pipeline(object):
         if self.parent is not None:
             q = dict(q, **(self.parent.get_key(**kwargs)[1]))
 
-        key = hashlib.sha1(json.dumps([self.get_id(), q],
-                                      sort_keys=True)).hexdigest()
+        key = hashlib.sha1(json.dumps([self.get_id(), q], sort_keys=True)
+                           .encode("utf-8")).hexdigest()
         if "kicid" in kwargs:
             key = "{0}-{1}".format(kwargs["kicid"], key)
         return key, q

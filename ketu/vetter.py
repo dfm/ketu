@@ -76,7 +76,7 @@ def _ln_evidence_outlier(lcs, period, duration, t0):
     return lnlike, lnlike + norm
 
 
-def _ln_evidence_box(lcs, period, duration, t0):
+def _ln_evidence_box0(lcs, period, duration, t0):
     def model(t, hp=0.5*period, hd=0.5*duration):
         mod = np.zeros_like(t)
         mod[np.fabs((t - t0 + hp) % period - hp) < hd] = -1.0
@@ -106,7 +106,29 @@ def _ln_evidence_box(lcs, period, duration, t0):
     return lnlike, lnlike - 0.5 * np.log(ivar) + 0.5 * np.log(2*np.pi)
 
 
-def _ln_evidence_vee(lcs, period, duration, t0):
+def _ln_evidence_box(lcs, period, duration, t0, eps=1.123e-2):
+    lnlike, f0 = _ln_evidence_box0(lcs, period, duration, t0)
+    lnd2fdx2 = 0.0
+
+    _, fp = _ln_evidence_box0(lcs, period + eps, duration, t0)
+    _, fm = _ln_evidence_box0(lcs, period - eps, duration, t0)
+    lnd2fdx2 += np.log(2*f0 - fp - fm) - 2 * np.log(eps) - np.log(2*np.pi)
+
+    _, fp = _ln_evidence_box0(lcs, period, duration + eps, t0)
+    _, fm = _ln_evidence_box0(lcs, period, duration - eps, t0)
+    lnd2fdx2 += np.log(2*f0 - fp - fm) - 2 * np.log(eps) - np.log(2*np.pi)
+
+    _, fp = _ln_evidence_box0(lcs, period, duration, t0 + eps)
+    _, fm = _ln_evidence_box0(lcs, period, duration, t0 - eps)
+    lnd2fdx2 += np.log(2*f0 - fp - fm) - 2 * np.log(eps) - np.log(2*np.pi)
+
+    if not np.isfinite(lnd2fdx2):
+        return lnlike, f0
+
+    return lnlike, f0 - 0.5 * lnd2fdx2
+
+
+def _ln_evidence_vee0(lcs, period, duration, t0):
     def model(t, hp=0.5*period, hd=0.5*duration):
         mod = np.zeros_like(t)
         dt = (t - t0 + hp) % period - hp
@@ -136,6 +158,28 @@ def _ln_evidence_vee(lcs, period, duration, t0):
     lnlike += 0.5 * np.sum(np.log(ivars)) - 0.5*len(depths)*np.log(2*np.pi)
 
     return lnlike, lnlike - 0.5 * np.log(ivar) + 0.5 * np.log(2*np.pi)
+
+
+def _ln_evidence_vee(lcs, period, duration, t0, eps=1.123e-2):
+    lnlike, f0 = _ln_evidence_vee0(lcs, period, duration, t0)
+    lnd2fdx2 = 0.0
+
+    _, fp = _ln_evidence_vee0(lcs, period + eps, duration, t0)
+    _, fm = _ln_evidence_vee0(lcs, period - eps, duration, t0)
+    lnd2fdx2 += np.log(2*f0 - fp - fm) - 2 * np.log(eps) - np.log(2*np.pi)
+
+    _, fp = _ln_evidence_vee0(lcs, period, duration + eps, t0)
+    _, fm = _ln_evidence_vee0(lcs, period, duration - eps, t0)
+    lnd2fdx2 += np.log(2*f0 - fp - fm) - 2 * np.log(eps) - np.log(2*np.pi)
+
+    _, fp = _ln_evidence_vee0(lcs, period, duration, t0 + eps)
+    _, fm = _ln_evidence_vee0(lcs, period, duration, t0 - eps)
+    lnd2fdx2 += np.log(2*f0 - fp - fm) - 2 * np.log(eps) - np.log(2*np.pi)
+
+    if not np.isfinite(lnd2fdx2):
+        return lnlike, f0
+
+    return lnlike, f0 - 0.5 * lnd2fdx2
 
 
 def _ln_evidence_transit(p, *args):

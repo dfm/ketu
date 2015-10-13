@@ -7,7 +7,10 @@ __all__ = ["Validate"]
 import os
 import json
 import numpy as np
-import cPickle as pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 
 try:
     import matplotlib.pyplot as pl
