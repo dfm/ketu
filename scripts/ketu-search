@@ -12,14 +12,14 @@ from scipy.stats import beta
 
 import gc
 import time
-import cPickle
+import pickle
 import traceback
 from IPython.parallel import Client, require
 
 import ketu
 
 
-@require(os, sys, gc, cPickle, traceback, time)
+@require(os, sys, gc, pickle, traceback, time)
 def search(bp):
     # Insane hackish output capturing context.
     # http://stackoverflow.com/questions/16571150
@@ -42,7 +42,7 @@ def search(bp):
     r, q, pipe = None, None, None
     try:
         with open(os.path.join(bp, "pipeline.pkl"), "rb") as f:
-            q, pipe = cPickle.load(f)
+            q, pipe = pickle.load(f)
 
         strt = time.time()
         with Capturing(os.path.join(bp, "output.log")):
@@ -148,7 +148,7 @@ if __name__ == "__main__":
     bs = len(fns)
     for batch in range(0, len(fns), bs):
         for fn in fns[batch:batch+bs]:
-            for i in range(args.ninj + int(~args.noinvert) + 2):
+            for i in range(args.ninj + int(~args.noinvert) + 1):
                 epicid = os.path.split(fn)[-1].split("-")[0][4:]
 
                 # Skip the custom targets.
@@ -176,7 +176,7 @@ if __name__ == "__main__":
                     q = dict(query)
 
                 # Invert the light curve.
-                q["invert"] = (i % 2) == 1
+                q["invert"] = (~args.noinvert) & (i == 1)
 
                 # Build the pipeline first.
                 pipe = ketu.k2.Data(cache=False,
@@ -195,7 +195,7 @@ if __name__ == "__main__":
                 except os.error:
                     pass
                 with open(os.path.join(outdir, "pipeline.pkl"), "w") as f:
-                    cPickle.dump((q, pipe), f, -1)
+                    pickle.dump((q, pipe), f, -1)
                 with open(os.path.join(outdir, "query.json"), "w") as f:
                     json.dump(q, f, sort_keys=True, indent=4)
 
