@@ -1,0 +1,12 @@
+conda install \
+    astropy \
+    cython \
+    h5py \
+    ipyparallel \
+    matplotlib \
+    numpy \
+    pandas \
+    pytables \
+    scipy
+
+pip install fitsio emcee
