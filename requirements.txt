@@ -2,6 +2,7 @@ conda install \
     astropy \
     cython \
     h5py \
+    ipyparallel \
     matplotlib \
     numpy \
     pandas \
