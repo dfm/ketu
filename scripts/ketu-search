@@ -145,10 +145,11 @@ if __name__ == "__main__":
 
     # Loop over the files.
     fns = glob.glob(lcs)
+    print("Found {0} files".format(len(fns)))
     bs = len(fns)
     for batch in range(0, len(fns), bs):
         for fn in fns[batch:batch+bs]:
-            for i in range(args.ninj + int(~args.noinvert) + 1):
+            for i in range(args.ninj + int(not args.noinvert) + 1):
                 epicid = os.path.split(fn)[-1].split("-")[0][4:]
 
                 # Skip the custom targets.
@@ -165,7 +166,12 @@ if __name__ == "__main__":
                 # Update the query.
                 query["light_curve_file"] = os.path.abspath(fn)
                 query["results_path"] = os.path.join(outdir)
-                if i:
+
+                # Build the pipeline first.
+                pipe = ketu.k2.Data(cache=False,
+                                    basepath=os.path.join(outdir, "cache"))
+                if i >= int(not args.noinvert) + 1:
+                    pipe = ketu.k2.Inject(pipe, cache=False)
                     k = np.argmax(np.random.multinomial(1, multi)) + 1
                     q = dict(query, **(generate_system(
                         k,
@@ -174,27 +180,21 @@ if __name__ == "__main__":
                     )))
                 else:
                     q = dict(query)
-
-                # Invert the light curve.
-                q["invert"] = (~args.noinvert) & (i == 1)
-
-                # Build the pipeline first.
-                pipe = ketu.k2.Data(cache=False,
-                                    basepath=os.path.join(outdir, "cache"))
-                if i >= 2:
-                    pipe = ketu.k2.Inject(pipe, cache=False)
                 pipe = ketu.k2.Likelihood(pipe, cache=False)
                 pipe = ketu.OneDSearch(pipe, cache=False)
                 pipe = ketu.IterativeTwoDSearch(pipe, cache=False)
                 pipe = ketu.Vetter(pipe, cache=False)
                 pipe = ketu.FeatureExtract(pipe, cache=False)
 
+                # Invert the light curve?
+                q["invert"] = (not args.noinvert) & (i == 1)
+
                 # Save the files.
                 try:
                     os.makedirs(query["results_path"])
                 except os.error:
                     pass
-                with open(os.path.join(outdir, "pipeline.pkl"), "w") as f:
+                with open(os.path.join(outdir, "pipeline.pkl"), "wb") as f:
                     pickle.dump((q, pipe), f, -1)
                 with open(os.path.join(outdir, "query.json"), "w") as f:
                     json.dump(q, f, sort_keys=True, indent=4)
