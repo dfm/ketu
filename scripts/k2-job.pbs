@@ -28,6 +28,7 @@ echo `which mpiexec` > mpiexec.log
 # and it should use the mpiexec that I enabled above.
 rm -rf $PROFILEDIR
 cp -r $HOME/.ipython/profile_mpi $PROFILEDIR
+export OMP_NUM_THREADS=1
 ipcluster start -n $PBS_NP --profile-dir=$PROFILEDIR &> ipcluster.log &
 
 sleep 5
