@@ -26,6 +26,7 @@ echo `which mpiexec` > mpiexec.log
 
 # Set up and start the IPython cluster. Note: this *is* started using MPI!!
 # and it should use the mpiexec that I enabled above.
+rm -rf $PROFILEDIR
 cp -r $HOME/.ipython/profile_mpi $PROFILEDIR
 ipcluster start -n $PBS_NP --profile-dir=$PROFILEDIR &> ipcluster.log &
 
