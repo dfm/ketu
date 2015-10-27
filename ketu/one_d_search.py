@@ -48,7 +48,7 @@ class OneDSearch(Pipeline):
             # Compute the grid of hypotheses.
             i = np.arange(len(time_grid))[m]
             imn, imx = i.min(), i.max()
-            compute_hypotheses(lc.lnlike, time_grid[imn:imx], durations,
+            compute_hypotheses(lc.search_lnlike, time_grid[imn:imx], durations,
                                depth_grid[imn:imx], depth_ivar_grid[imn:imx],
                                dll_grid[imn:imx])
 

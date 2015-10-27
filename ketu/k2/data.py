@@ -25,6 +25,7 @@ class Data(Pipeline):
         "skip": (0, False),
         "use_gp": (True, False),
         "invert": (False, False),
+        "detrend": (False, False),
     }
 
     def get_result(self, query, parent_response):
@@ -35,10 +36,11 @@ class Data(Pipeline):
         cat = Catalog(query["catalog_file"]).df
         _, star = next(cat[cat.epic_number == int(epicid)].iterrows())
 
+        c = DetrendedK2LightCurve if query["detrend"] else K2LightCurve
         return dict(
             epic=star,
             starid=int(star.epic_number),
-            target_light_curves=K2LightCurve(
+            target_light_curves=c(
                 fn,
                 query["initial_time"],
                 gp=query["use_gp"],
@@ -146,6 +148,9 @@ class K2LightCurve(object):
                 break
             count = m1.sum()
 
+        # Save the sigma clipping mask.
+        self.sig_clip = m1[~m2]
+
         # Force contiguity.
         m2 = ~m2
         self.m[self.m] = m2
@@ -168,6 +173,7 @@ class K2LightCurve(object):
         # Remove the outliers and finalize the dataset.
         m = ~m
         self.m[self.m] = m
+        self.sig_clip = self.sig_clip[m]
         self.time = np.ascontiguousarray(self.time[m], dtype=np.float64)
         self.flux = np.ascontiguousarray(self.flux[m], dtype=np.float64)
         self.ferr = np.ascontiguousarray(self.ferr[m], dtype=np.float64)
@@ -217,6 +223,9 @@ class K2LightCurve(object):
         ll = -0.5 * np.dot(r, Ky - depth * Km)
         return ll - self.ll0, depth, ivar
 
+    def search_lnlike(self, model=None):
+        return self.lnlike(model=model)
+
     def predict(self, y=None):
         if y is None:
             y = self.flux
@@ -227,3 +236,43 @@ class K2LightCurve(object):
 
     def predict_b(self, y):
         return np.dot(self.K_b, cho_solve(self.factor, y))
+
+
+class DetrendedK2LightCurve(K2LightCurve):
+
+    def prepare(self, *args, **kwargs):
+        super(DetrendedK2LightCurve, self).prepare(*args, **kwargs)
+
+        # Compute and subtract the prediction.
+        m = self.sig_clip
+        inds = (np.arange(len(self.flux))[m, None],
+                np.arange(len(self.flux))[None, m])
+        Ks = self.K_0[:, m]
+        factor = cho_factor(self.K[inds])
+        mu = np.dot(Ks, cho_solve(factor, self.flux[m]))
+        cov = np.dot(Ks, cho_solve(factor, Ks.T))
+        cov = self.K_0 - cov
+
+        self.detrend_flux = self.flux - mu
+        self.detrend_ferr = self.ferr**2 + np.diag(cov)
+        self.ivar = 1.0 / self.detrend_ferr
+        self.detrend_ferr[:] = np.sqrt(self.ferr)
+
+        # Pre-compute the base likelihood.
+        self.ll0 = -0.5 * np.sum(self.detrend_flux**2 * self.ivar)
+
+    def search_lnlike(self, model=None):
+        if model is None:
+            return 0.0
+
+        # Evaluate the transit model.
+        m = model(self.time)
+        if np.all(m == 0.0):  # m[0] != 0.0 or m[-1] != 0.0 or
+            return 0.0, 0.0, 0.0
+
+        A = np.vander(m, 2)
+        AT = A.T
+        ivar = np.dot(AT, A * self.ivar[:, None])
+        w = np.linalg.solve(ivar, np.dot(AT, self.detrend_flux * self.ivar))
+        ll = self.lnlike_eval(self.detrend_flux - np.dot(A, w))
+        return ll - self.ll0, w[0], ivar[0, 0]
