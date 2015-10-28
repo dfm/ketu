@@ -72,6 +72,7 @@ class K2LightCurve(object):
         if invert:
             mu = np.median(self.flux[np.isfinite(self.flux)])
             self.flux = 2 * mu - self.flux
+        self.quality = np.array(data["quality"], dtype=int)
         q = data["quality"]
         q = ((q == 0) | (q == 16384).astype(bool))
         self.m = (np.isfinite(self.time) &
@@ -103,6 +104,7 @@ class K2LightCurve(object):
             lc.m[chunk] = self.m[chunk]
             lc.time = np.ascontiguousarray(lc.time[lc.m], dtype=np.float64)
             lc.flux = np.ascontiguousarray(lc.flux[lc.m], dtype=np.float64)
+            lc.quality = np.ascontiguousarray(lc.quality[lc.m], dtype=int)
             lcs.append(lc)
         return lcs
 
@@ -158,27 +160,31 @@ class K2LightCurve(object):
         self.flux = np.ascontiguousarray(self.flux[m2], dtype=np.float64)
         self.ferr = np.ascontiguousarray(self.ferr[m2], dtype=np.float64)
         self.basis = np.ascontiguousarray(self.basis[:, m2], dtype=np.float64)
+        self.quality = np.ascontiguousarray(self.quality[m2], dtype=int)
 
         # Find outliers.
         self.build_kernels()
-        mu = np.dot(self.K_0, np.linalg.solve(self.K, self.flux))
-        delta = np.diff(self.flux - mu)
-        absdel = np.abs(delta)
-        mad = np.median(absdel)
-        m = np.zeros(self.m.sum(), dtype=bool)
-        m[1:-1] = absdel[1:] > sigma_clip * mad
-        m[1:-1] &= absdel[:-1] > sigma_clip * mad
-        m[1:-1] &= np.sign(delta[1:]) != np.sign(delta[:-1])
+        for _ in range(2):
+            mu = np.dot(self.K_0, np.linalg.solve(self.K, self.flux))
+            delta = np.diff(self.flux - mu)
+            absdel = np.abs(delta)
+            mad = np.median(absdel)
+            m = np.zeros(self.m.sum(), dtype=bool)
+            m[1:-1] = absdel[1:] > sigma_clip * mad
+            m[1:-1] &= absdel[:-1] > sigma_clip * mad
+            m[1:-1] &= np.sign(delta[1:]) != np.sign(delta[:-1])
 
-        # Remove the outliers and finalize the dataset.
-        m = ~m
-        self.m[self.m] = m
-        self.sig_clip = self.sig_clip[m]
-        self.time = np.ascontiguousarray(self.time[m], dtype=np.float64)
-        self.flux = np.ascontiguousarray(self.flux[m], dtype=np.float64)
-        self.ferr = np.ascontiguousarray(self.ferr[m], dtype=np.float64)
-        self.basis = np.ascontiguousarray(self.basis[:, m], dtype=np.float64)
-        self.build_kernels()
+            # Remove the outliers and finalize the dataset.
+            m = ~m
+            self.m[self.m] = m
+            self.sig_clip = self.sig_clip[m]
+            self.time = np.ascontiguousarray(self.time[m], dtype=np.float64)
+            self.flux = np.ascontiguousarray(self.flux[m], dtype=np.float64)
+            self.ferr = np.ascontiguousarray(self.ferr[m], dtype=np.float64)
+            self.quality = np.ascontiguousarray(self.quality[m], dtype=int)
+            self.basis = np.ascontiguousarray(self.basis[:, m],
+                                              dtype=np.float64)
+            self.build_kernels()
 
         # Precompute some factors.
         self.factor = cho_factor(self.K)
@@ -256,7 +262,7 @@ class DetrendedK2LightCurve(K2LightCurve):
         self.detrend_flux = self.flux - mu
         self.detrend_ferr = self.ferr**2 + np.diag(cov)
         self.ivar = 1.0 / self.detrend_ferr
-        self.detrend_ferr[:] = np.sqrt(self.ferr)
+        self.detrend_ferr[:] = np.sqrt(self.detrend_ferr)
 
         # Pre-compute the base likelihood.
         self.ll0 = -0.5 * np.sum(self.detrend_flux**2 * self.ivar)
