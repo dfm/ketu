@@ -13,7 +13,7 @@ from scipy.linalg import cho_solve, cho_factor
 
 from .epic import Catalog
 from ..pipeline import Pipeline
-from ..gp_heuristics import estimate_tau, kernel
+from ..gp_heuristics import estimate_tau, kernel, optimize_gp_params
 
 
 class Data(Pipeline):
@@ -163,8 +163,8 @@ class K2LightCurve(object):
         self.quality = np.ascontiguousarray(self.quality[m2], dtype=int)
 
         # Find outliers.
-        self.build_kernels()
         for _ in range(2):
+            self.build_kernels()
             mu = np.dot(self.K_0, np.linalg.solve(self.K, self.flux))
             delta = np.diff(self.flux - mu)
             absdel = np.abs(delta)
@@ -184,7 +184,8 @@ class K2LightCurve(object):
             self.quality = np.ascontiguousarray(self.quality[m], dtype=int)
             self.basis = np.ascontiguousarray(self.basis[:, m],
                                               dtype=np.float64)
-            self.build_kernels()
+        self.build_kernels(mask=self.sig_clip)
+        # self.build_kernels(mask=self.sig_clip, optimize=True)
 
         # Precompute some factors.
         self.factor = cho_factor(self.K)
@@ -193,12 +194,22 @@ class K2LightCurve(object):
         # Pre-compute the base likelihood.
         self.ll0 = self.lnlike()
 
-    def build_kernels(self):
-        self.K_b = np.dot(self.basis.T, self.basis * self.lam)
+    def build_kernels(self, mask=None, optimize=False):
+        if mask is None:
+            mask = np.ones(len(self.flux), dtype=bool)
+        self.K_b = np.dot(self.basis.T, self.basis*self.lam)
         if self.gp:
-            tau = self.tau_frac * estimate_tau(self.time, self.flux)
+            tau = self.tau_frac * estimate_tau(self.time[mask],
+                                               self.flux[mask])
             print("tau = {0}".format(tau))
-            self.K_t = np.var(self.flux) * kernel(tau, self.time)
+            if optimize:
+                K_b = np.dot(self.basis[:, mask].T,
+                             self.basis[:, mask]*self.lam)
+                amp, tau = optimize_gp_params(tau, K_b, self.time[mask],
+                                              self.flux[mask], self.ferr[mask])
+            else:
+                amp = np.var(self.flux)
+            self.K_t = amp * kernel(tau, self.time)
             self.K_0 = self.K_b + self.K_t
         else:
             self.K_0 = self.K_b

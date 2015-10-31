@@ -5,6 +5,8 @@ from __future__ import division, print_function
 __all__ = ["estimate_tau", "kernel"]
 
 import numpy as np
+from scipy.optimize import minimize
+from scipy.linalg import cho_factor, cho_solve
 from scipy.ndimage.filters import gaussian_filter
 
 
@@ -34,3 +36,22 @@ def kernel(tau, t):
     """Matern-3/2 kernel function"""
     r = np.sqrt(3 * ((t[:, None] - t[None, :]) / tau) ** 2)
     return (1 + r) * np.exp(-r)
+
+
+def optimize_gp_params(tau0, K_b, t, y, yerr):
+    def nll(p):
+        K_t = np.exp(p[0]) * kernel(np.exp(p[1]), t)
+        i = np.diag_indices_from(K_t)
+        K_t[i] += yerr ** 2
+        factor = cho_factor(K_t + K_b)
+        halflndet = np.sum(np.log(np.diag(factor[0])))
+        r = 0.5*np.dot(y, cho_solve(factor, y)) + halflndet
+        return r
+
+    p0 = np.log([np.var(y), tau0])
+    r = minimize(nll, p0, method="L-BFGS-B", bounds=[
+        (np.var(y) * 0.1, 10.0 * np.var(y)),
+        (np.log(0.1), np.log(50.0)),
+    ])
+    print("Optimized tau = {0}".format(np.exp(r.x[1])))
+    return np.exp(r.x)

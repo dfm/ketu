@@ -9,6 +9,7 @@ import h5py
 import transit
 import numpy as np
 from scipy.optimize import minimize
+from scipy.signal import lombscargle
 
 from .pipeline import Pipeline
 
@@ -203,6 +204,50 @@ def _ln_evidence_transit(p, *args):
     return -f0, lnZ
 
 
+def _ln_evidence_period(lcs):
+    if not hasattr(lcs[0], "detrend_flux"):
+        return -np.inf, -np.inf
+    x = np.concatenate([lc.time for lc in lcs])
+    y = np.concatenate([lc.detrend_flux for lc in lcs])
+    ivar = np.concatenate([1./lc.detrend_ferr**2 for lc in lcs])
+    delta = np.max(x) - np.min(x)
+    f = 2*np.pi*np.arange(max(2./24., 10./delta), 1.0 / 0.025, 0.1 / delta)
+    p = lombscargle(x, y, f)
+    omega = f[np.argmax(p)]
+    AT = np.vstack([np.sin(omega*x), np.cos(omega*x), np.ones(len(x))])
+    A = AT.T
+    cov = np.dot(AT, A * ivar[:, None])
+    w = np.linalg.solve(cov, np.dot(AT, y * ivar))
+
+    def model(t):
+        A = np.vstack([np.sin(omega*t), np.cos(omega*t)]).T
+        return np.dot(A, w[:2])
+
+    # Compute the evidence.
+    lnlike = 0.0
+    depths = np.empty(len(lcs))
+    ivars = np.empty(len(lcs))
+    for i, lc in enumerate(lcs):
+        l0, depths[i], ivars[i] = lc.lnlike(model)
+        lnlike += lc.ll0
+        if ivars[i] > 0.0:
+            lnlike += l0
+
+    m = ivars > 0.0
+    depths = depths[m]
+    ivars = ivars[m]
+
+    depth = np.sum(ivars * depths) / np.sum(ivars)
+    ivar = np.sum(ivars)
+
+    lnlike -= 0.5 * np.sum(depths**2 * ivars)
+    lnlike += 0.5 * depth**2 * ivar
+    lnlike += 0.5 * np.sum(np.log(ivars)) - 0.5*len(depths)*np.log(2*np.pi)
+
+    return (lnlike, lnlike - 0.5 * np.log(ivar) + 0.5 * np.log(2*np.pi),
+            2*np.pi/omega)
+
+
 class Vetter(Pipeline):
 
     cache_ext = ".h5"
@@ -271,6 +316,9 @@ class Vetter(Pipeline):
             peak["lnlike_outlier"], peak["lnZ_outlier"] = _ln_evidence_outlier(
                 lcs, peak["transit_period"], peak["transit_duration"],
                 peak["transit_t0"])
+
+            peak["lnlike_period"], peak["lnZ_period"], peak["osc_period"] = \
+                _ln_evidence_period(lcs)
 
             # Subtract the best fit transit model.
             for lc in lcs:
