@@ -24,14 +24,15 @@ class IterativeTwoDSearch(TwoDSearch):
         npeaks=(3, False),
         mask_frac=(2.0, False),
         min_points=(500, False),
+        min_transits=(3, False),
     )
 
     def get_alpha(self, query, parent_response):
         a = query.get("alpha", None)
         if a is not None:
             return float(a)
-        lc = parent_response.model_light_curves[0]
-        n = len(lc.time)
+        lcs = parent_response.model_light_curves
+        n = sum(len(lc.time) for lc in lcs)
         k = parent_response.nbasis
         return k * np.log(n)
 
@@ -56,7 +57,8 @@ class IterativeTwoDSearch(TwoDSearch):
         peaks = []
         for _ in range(query["npeaks"]):
             # Run a 2D search.
-            results = grid_search(alpha, tmin, tmax, time_spacing, depth_1d,
+            results = grid_search(query["min_transits"], alpha,
+                                  tmin, tmax, time_spacing, depth_1d,
                                   depth_ivar_1d, dll_1d, periods, dt)
             (t0_2d, phic_same, phic_same_2, phic_variable, depth_2d,
              depth_ivar_2d) = results
@@ -86,6 +88,8 @@ class IterativeTwoDSearch(TwoDSearch):
                 phic_same=phic_same[top_peak],
                 phic_same_second=phic_same_2[top_peak],
                 phic_variable=phic_variable[top_peak],
+                duty_cycle=np.sum(depth_ivar_1d > 0.0) / len(depth_ivar_1d),
+                data_span=tmax - tmin,
             ))
 
             # Mask out these transits.

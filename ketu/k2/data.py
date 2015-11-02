@@ -185,7 +185,6 @@ class K2LightCurve(object):
             self.basis = np.ascontiguousarray(self.basis[:, m],
                                               dtype=np.float64)
         self.build_kernels(mask=self.sig_clip)
-        # self.build_kernels(mask=self.sig_clip, optimize=True)
 
         # Precompute some factors.
         self.factor = cho_factor(self.K)

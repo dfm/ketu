@@ -98,7 +98,7 @@ if __name__ == "__main__":
                         help="invert the light curves too")
     parser.add_argument("--min-period", type=float, default=1.0,
                         help="minimum period")
-    parser.add_argument("--max-period", type=float, default=50.0,
+    parser.add_argument("--max-period", type=float, default=40.0,
                         help="maximum period")
     parser.add_argument("-p", "--profile-dir", default=None,
                         help="the IPython profile dir")

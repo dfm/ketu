@@ -20,7 +20,8 @@ class TwoDSearch(Pipeline):
         max_period=(None, True),
         delta_log_period=(None, False),
         dt=(None, False),
-        alpha=(None, False)
+        alpha=(None, False),
+        min_transits=(3, False),
     )
 
     def get_period_grid(self, query, parent_response):
@@ -62,7 +63,8 @@ class TwoDSearch(Pipeline):
         depth_ivar_1d = parent_response.depth_ivar_1d
         dll_1d = parent_response.dll_1d
 
-        results = grid_search(alpha, tmin, tmax, time_spacing, depth_1d,
+        results = grid_search(query["min_transits"], alpha,
+                              tmin, tmax, time_spacing, depth_1d,
                               depth_ivar_1d, dll_1d, periods, dt)
         t0_2d, phic_same, phic_same_2, phic_variable, depth_2d, depth_ivar_2d \
             = results

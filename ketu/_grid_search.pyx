@@ -13,7 +13,8 @@ ctypedef np.float64_t DTYPE_t
 cdef double ln2pi = log(2.0 * M_PI)
 
 @cython.boundscheck(False)
-cdef int evaluate_single(double alpha, double period, double t0,
+cdef int evaluate_single(int min_transits, double alpha,
+                         double period, double t0,
                          double tmin, double tmax, double time_spacing,
                          int nduration, double* dll_1d,
                          const double* depth_1d, const double* depth_ivar_1d,
@@ -81,7 +82,7 @@ cdef int evaluate_single(double alpha, double period, double t0,
 
         # If there was any measurement for the depth, update the
         # single depth model.
-        if depth_ivar_2d[k] > 0 and nind >= 3:
+        if depth_ivar_2d[k] > 0 and nind >= min_transits:
             depth_2d[k] /= depth_ivar_2d[k]
 
             phic_same[k] += 0.5 * depth_2d[k] * depth_2d[k] * depth_ivar_2d[k]
@@ -96,7 +97,7 @@ cdef int evaluate_single(double alpha, double period, double t0,
 
 
 @cython.boundscheck(False)
-def grid_search(double alpha,
+def grid_search(int min_transits, double alpha,
                 double tmin, double tmax, double time_spacing,
                 np.ndarray[DTYPE_t, ndim=2] depth_1d,
                 np.ndarray[DTYPE_t, ndim=2] depth_ivar_1d,
@@ -147,7 +148,8 @@ def grid_search(double alpha,
 
         # Loop over every possible phase for the given period.
         while 1:
-            evaluate_single(alpha, period, t0, tmin, tmax, time_spacing,
+            evaluate_single(min_transits, alpha, period,
+                            t0, tmin, tmax, time_spacing,
                             nduration, dll_1d_data, depth_1d_data,
                             depth_ivar_1d_data,
                             phic_variable_tmp, phic_same_tmp, depth_2d_tmp,
