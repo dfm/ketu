@@ -10,7 +10,7 @@ import pandas as pd
 try:
     from StringIO import StringIO
 except ImportError:
-    from io import StringIO
+    from io import BytesIO as StringIO
 
 
 class Catalog(object):

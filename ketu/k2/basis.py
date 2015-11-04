@@ -36,6 +36,10 @@ def load_data(fn):
     x = np.arange(len(y))
     m = np.isfinite(y)
     y[~m] = np.interp(x[~m], x[m], y[m], 1)
+    if np.any(np.isnan(y)) or np.any(np.isinf(y)):
+        print(y)
+        print(fn)
+        assert 0
     return y
 
 
@@ -100,10 +104,13 @@ def build(lc_pattern, outfile, nbasis=500):
     _, _, basis = fbpca.pca(X, k=nbasis, raw=True)
     print("Took {0:.1f} seconds".format(time.time() - strt))
 
+    print(np.any(np.isnan(basis)), np.any(np.isinf(basis)))
+
     # Compute the prior.
     print("Computing the empirical 'prior'...")
     factor = cho_factor(np.dot(basis, basis.T))
     Y = 1e3 * (lcs / np.median(lcs, axis=1)[:, None] - 1)
+    Y[~np.isfinite(Y)] = 0.0  # WTF?!
     weights = cho_solve(factor, np.dot(basis, Y.T))
     weights = np.concatenate((weights, -weights), axis=1)
     basis *= np.sqrt(np.median(weights**2, axis=1))[:, None]
